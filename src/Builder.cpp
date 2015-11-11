@@ -178,8 +178,8 @@ void Builder::close () {
     }
     // For objects we leave needNrSubs at true here!
   }
-  else if (_start[tos] == 0x06 &&   // an array
-           (_pos - tos) - index[0] == index.size() * (index[1] - index[0])) {
+  else if (_start[tos] == 0x06) { // &&   // an array
+           //(_pos - tos) - index[0] == index.size() * (index[1] - index[0])) {
     // In this case it could be that all entries have the same length
     // and we do not need an offset table at all:
     bool noTable = true;
