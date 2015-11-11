@@ -195,6 +195,7 @@ void Builder::close () {
         }
       }
     }
+    noTable = true;
     if (noTable) {
       needIndexTable = false;
       needNrSubs = false;
