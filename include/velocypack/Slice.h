@@ -300,7 +300,7 @@ namespace arangodb {
           if (h <= 0x05) {    // No offset table or length, need to compute:
             ValueLength firstSubOffset = findDataOffset(h);
             Slice first(_start + firstSubOffset, customTypeHandler);
-            return (end - firstSubOffset) / first.byteSize();
+            return (end - offsetSize - firstSubOffset) / first.byteSize();
           } 
           else if (offsetSize < 8) {
             return readInteger<ValueLength>(_start + offsetSize + 1, offsetSize);
@@ -784,7 +784,7 @@ namespace arangodb {
           ValueLength n;
           if (h <= 0x05) {    // No offset table or length, need to compute:
             Slice first(_start + dataOffset, customTypeHandler);
-            n = (end - dataOffset) / first.byteSize();
+            n = (end - offsetSize - dataOffset) / first.byteSize();
           }
           else if (offsetSize < 8) {
             n = readInteger<ValueLength>(_start + 1 + offsetSize, offsetSize);

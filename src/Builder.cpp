@@ -169,10 +169,12 @@ void Builder::close () {
 
   bool needIndexTable = true;
   bool needNrSubs = true;
+  ValueLength subSize = 0;
   if (index.size() == 1) {
     needIndexTable = false;
     if (_start[tos] == 0x06) {
       needNrSubs = false;
+      subSize = _pos - tos - index[0];
     }
     // For objects we leave needNrSubs at true here!
   }
@@ -196,6 +198,7 @@ void Builder::close () {
     if (noTable) {
       needIndexTable = false;
       needNrSubs = false;
+      subSize = subLen;
     }
   }
 
@@ -204,6 +207,7 @@ void Builder::close () {
         // can be 1, 2, 4 or 8 for the byte width of the offsets,
         // the byte length and the number of subvalues:
   if (_pos - tos + (needIndexTable ? index.size() : 0) 
+                 + (! needIndexTable && _start[tos] == 0x06 ? 1 : 0)
                  - (needNrSubs ? 6 : 7) <= 0xff) {
     // We have so far used _pos - tos bytes, including the reserved 8
     // bytes for byte length and number of subvalues. In the 1-byte number
@@ -211,10 +215,14 @@ void Builder::close () {
     // for the index table
     offsetSize = 1;
   }
-  else if (_pos - tos + (needIndexTable ? 2 * index.size() : 0) <= 0xffff) {
+  else if (_pos - tos + (needIndexTable ? 2 * index.size() : 0) 
+                      + (! needIndexTable && _start[tos] == 0x06 ? 2 : 0)
+           <= 0xffff) {
     offsetSize = 2;
   }
-  else if (_pos - tos + (needIndexTable ? 4 * index.size() : 0) <= 0xffffffffu) {
+  else if (_pos - tos + (needIndexTable ? 4 * index.size() : 0) 
+                      + (! needIndexTable && _start[tos] == 0x06 ? 4 : 0)
+           <= 0xffffffffu) {
     offsetSize = 4;
   }
   else {
@@ -266,6 +274,8 @@ void Builder::close () {
   else {  // no index table
     if (_start[tos] == 0x06) {
       _start[tos] = 0x02;
+      // Add size of subitems at the end:
+      appendLength(subSize, offsetSize);
     }
   }
   // Finally fix the byte width in the type byte:
