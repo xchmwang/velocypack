@@ -158,7 +158,7 @@ class ObjectIterator {
     }
 
     if (slice.head() == 0x14 && slice.length() > 0) {
-      _current = slice.keyAt(0).start();
+      _current = slice.keyAt(0, false).start();
     }
   }
 
