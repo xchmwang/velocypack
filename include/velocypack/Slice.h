@@ -747,9 +747,10 @@ class Slice {
   std::string toString(Options const* options = &Options::Defaults) const;
   std::string hexType() const;
 
+ private:
+  // Seed table for cuckoo hashes:
   static ValueLength const seedTable[3 * 256];
 
- private:
   // return the value for a UInt object, without checks
   // returns 0 for invalid values/types
   uint64_t getUIntUnchecked() const;
