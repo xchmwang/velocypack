@@ -286,7 +286,7 @@ Empty objects are simply stored as a single byte 0x0a.
 ### Cuckoo hashed objects
 
 We next describe the type cases 0x0b to 0x0e, see below for the
-type 0x0f to 0x12 and the special compact type 0x14.
+special compact type 0x14.
 
 Nonempty objects look like this (we need to distinguish types):
 
@@ -375,6 +375,9 @@ depending on the SEED, three hash functions (taken mod the NRSLOTS)
 give for each attribute name three possible positions and it is
 guaranteed that the attribute, if present in the object, resides in one
 of these three positions.
+
+Note that objects with a single subitem are always stored with the
+compact type 0x14 (see below).
 
 Example: the object `{"a": 12, "b": true, "c": "xyz"}` can have the hexdump:
 
