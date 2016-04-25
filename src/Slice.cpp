@@ -47,9 +47,9 @@ VT const Slice::TypeMap[256] = {
     /* 0x08 */ VT::Array,    /* 0x09 */ VT::Array,
     /* 0x0a */ VT::Object,   /* 0x0b */ VT::Object,
     /* 0x0c */ VT::Object,   /* 0x0d */ VT::Object,
-    /* 0x0e */ VT::Object,   /* 0x0f */ VT::Object,
-    /* 0x10 */ VT::Object,   /* 0x11 */ VT::Object,
-    /* 0x12 */ VT::Object,   /* 0x13 */ VT::Array,
+    /* 0x0e */ VT::Object,   /* 0x0f */ VT::None,
+    /* 0x10 */ VT::None,     /* 0x11 */ VT::None,
+    /* 0x12 */ VT::None,     /* 0x13 */ VT::Array,
     /* 0x14 */ VT::Object,   /* 0x15 */ VT::None,
     /* 0x16 */ VT::None,     /* 0x17 */ VT::Illegal,
     /* 0x18 */ VT::Null,     /* 0x19 */ VT::Bool,
@@ -185,10 +185,6 @@ unsigned int const Slice::WidthMap[32] = {
     2,  // 0x0c, object with sorted index table
     4,  // 0x0d, object with sorted index table
     8,  // 0x0e, object with sorted index table
-    1,  // 0x0f, object with unsorted index table
-    2,  // 0x10, object with unsorted index table
-    4,  // 0x11, object with unsorted index table
-    8,  // 0x12, object with unsorted index table
     0};
 
 unsigned int const Slice::FirstSubMap[32] = {
@@ -200,17 +196,13 @@ unsigned int const Slice::FirstSubMap[32] = {
     9,  // 0x05, array without index table
     3,  // 0x06, array with index table
     5,  // 0x07, array with index table
-    8,  // 0x08, array with index table
-    8,  // 0x09, array with index table
+    9,  // 0x08, array with index table
+    9,  // 0x09, array with index table
     1,  // 0x0a, empty object
-    3,  // 0x0b, object with sorted index table
-    5,  // 0x0c, object with sorted index table
-    8,  // 0x0d, object with sorted index table
-    8,  // 0x0e, object with sorted index table
-    3,  // 0x0f, object with unsorted index table
-    5,  // 0x10, object with unsorted index table
-    8,  // 0x11, object with unsorted index table
-    8,  // 0x12, object with unsorted index table
+    5,  // 0x0b, object with sorted index table
+    9,  // 0x0c, object with sorted index table
+    9,  // 0x0d, object with sorted index table
+    9,  // 0x0e, object with sorted index table
     0};
 
 ValueLength const Slice::seedTable[3 * 256] = { 
@@ -557,6 +549,7 @@ std::string Slice::toString(Options const* options) const {
 std::string Slice::hexType() const { return HexDump::toHex(head()); }
   
 uint64_t Slice::normalizedHash(uint64_t seed) const {
+  // FIXME: CUCKOO
   uint64_t value;
 
   if (isNumber()) {
@@ -609,53 +602,63 @@ Slice Slice::get(std::string const& attribute) const {
 
   ValueLength const offsetSize = indexEntrySize(h);
   ValueLength end = readInteger<ValueLength>(_start + 1, offsetSize);
-
-  // read number of items
-  ValueLength n;
-  if (offsetSize < 8) {
-    n = readInteger<ValueLength>(_start + 1 + offsetSize, offsetSize);
+  ValueLength nrSlots;
+  ValueLength htBase;
+  uint8_t seed;
+  if (offsetSize < 4) {
+    nrSlots = readInteger<ValueLength>(_start + 1 + 2 * offsetSize, offsetSize);
+    htBase = end - nrSlots * offsetSize;
+    seed = _start[1 + 3 * offsetSize];
   } else {
-    n = readInteger<ValueLength>(_start + end - offsetSize, offsetSize);
+    nrSlots = readInteger<ValueLength>(_start+end-1-offsetSize, offsetSize);
+    htBase = end - nrSlots * offsetSize - 1 - (offsetSize == 4 ? 8 : 16);
+    seed = _start[end-1];
   }
-
-  if (n == 1) {
-    // Just one attribute, there is no index table!
-    Slice key = Slice(_start + findDataOffset(h));
-
-    if (key.isString()) {
-      if (key.isEqualString(attribute)) {
-        return Slice(key.start() + key.byteSize());
-      }
-      // fall through to returning None Slice below
-    } else if (key.isSmallInt() || key.isUInt()) {
-      // translate key
-      if (Options::Defaults.attributeTranslator == nullptr) {
-        throw Exception(Exception::NeedAttributeTranslator);
-      }
-      if (key.translateUnchecked().isEqualString(attribute)) {
-        return Slice(key.start() + key.byteSize());
-      }
+  bool small = nrSlots <= 0x1000000;
+  Slice s;
+  Slice k;
+  char const* st;
+  ValueLength stLength;
+  ValueLength offset;
+  ValueLength pos[3];
+  fasthash64x3(attribute.c_str(), attribute.size(), seedTable + 3 * seed, pos);
+  pos[0] = small ? fastModulo32Bit(pos[0], nrSlots) : pos[0] % nrSlots;
+  offset = readInteger<ValueLength>(_start + htBase + pos[0] * offsetSize,
+                                    offsetSize);
+  if (offset != 0) {
+    s = Slice(_start + offset);
+    k = s.makeKey();
+    st = k.getString(stLength);
+    if (attribute.size() == stLength &&
+        memcmp(attribute.c_str(), st, stLength) == 0) {
+      return Slice(s._start + s.byteSize());
     }
-
-    // no match or invalid key type
-    return Slice();
   }
-
-  ValueLength const ieBase =
-      end - n * offsetSize - (offsetSize == 8 ? offsetSize : 0);
-
-  // only use binary search for attributes if we have at least this many entries
-  // otherwise we'll always use the linear search
-  static ValueLength const SortedSearchEntriesThreshold = 4;
-
-  bool const isSorted = (h >= 0x0b && h <= 0x0e);
-  if (isSorted && n >= SortedSearchEntriesThreshold) {
-    // This means, we have to handle the special case n == 1 only
-    // in the linear search!
-    return searchObjectKeyBinary(attribute, ieBase, offsetSize, n);
+  pos[1] = small ? fastModulo32Bit(pos[1], nrSlots) : pos[1] % nrSlots;
+  offset = readInteger<ValueLength>(_start + htBase + pos[1] * offsetSize,
+                                    offsetSize);
+  if (offset != 0) {
+    s = Slice(_start + offset);
+    k = s.makeKey();
+    st = k.getString(stLength);
+    if (attribute.size() == stLength &&
+        memcmp(attribute.c_str(), st, stLength) == 0) {
+      return Slice(s._start + s.byteSize());
+    }
   }
-
-  return searchObjectKeyLinear(attribute, ieBase, offsetSize, n);
+  pos[2] = small ? fastModulo32Bit(pos[2], nrSlots) : pos[2] % nrSlots;
+  offset = readInteger<ValueLength>(_start + htBase + pos[1] * offsetSize,
+                                    offsetSize);
+  if (offset != 0) {
+    s = Slice(_start + offset);
+    k = s.makeKey();
+    st = k.getString(stLength);
+    if (attribute.size() == stLength &&
+        memcmp(attribute.c_str(), st, stLength) == 0) {
+      return Slice(s._start + s.byteSize());
+    }
+  }
+  return noneSlice();
 }
 
 // return the value for an Int object
@@ -804,16 +807,31 @@ ValueLength Slice::getNthOffset(ValueLength index) const {
 
   ValueLength dataOffset = 0;
 
-  // find the number of items
+  // find the number of items or number of slots:
   ValueLength n;
+  ValueLength ieBase = 0;   // base of index table
   if (h <= 0x05) {  // No offset table or length, need to compute:
     dataOffset = findDataOffset(h);
     Slice first(_start + dataOffset);
     n = (end - dataOffset) / first.byteSize();
-  } else if (offsetSize < 8) {
-    n = readInteger<ValueLength>(_start + 1 + offsetSize, offsetSize);
-  } else {
-    n = readInteger<ValueLength>(_start + end - offsetSize, offsetSize);
+  } else if (h <= 0x09) {   // array with offset table
+    if (offsetSize < 8) {
+      n = readInteger<ValueLength>(_start + 1 + offsetSize, offsetSize);
+      ieBase = end - n * offsetSize;
+    } else {
+      n = readInteger<ValueLength>(_start + end - offsetSize, offsetSize);
+      ieBase = end - n * offsetSize - 8;
+    }
+  } else {   // only remaining: types 0x0b-0x0e, cuckoo hashed objects
+    if (offsetSize < 4) {
+      n = readInteger<ValueLength>(_start + 1 + 2 * offsetSize, offsetSize);
+      ieBase = end - n * offsetSize;
+    } else {
+      n = readInteger<ValueLength>(_start + end - 1 - offsetSize, offsetSize);
+      ieBase = end - n * offsetSize - 1 - (offsetSize == 4 ? 8 : 16);
+    }
+    // Note that here, n is the number of slots in the hash table and
+    // will be larger than the number of subitems!
   }
 
   if (index >= n) {
@@ -832,9 +850,8 @@ ValueLength Slice::getNthOffset(ValueLength index) const {
     return dataOffset + index * Slice(_start + dataOffset).byteSize();
   }
 
-  ValueLength const ieBase =
-      end - n * offsetSize + index * offsetSize - (offsetSize == 8 ? 8 : 0);
-  return readInteger<ValueLength>(_start + ieBase, offsetSize);
+  return readInteger<ValueLength>(_start + ieBase + index * offsetSize, 
+                                  offsetSize);
 }
 
 // extract the nth member from an Array

@@ -49,6 +49,12 @@ namespace velocypack {
 uint64_t fasthash64(void const*, size_t, uint64_t);
 void fasthash64x3(void const*, size_t, uint64_t const*, uint64_t*);
 
+static inline uint32_t fastModulo32Bit(ValueLength a, ValueLength b) {
+  uint32_t aa = static_cast<uint32_t>((a >> 32) ^ a);
+  uint32_t bb = static_cast<uint32_t>(b);
+  return aa % bb;
+}
+
 class SliceScope;
 
 class Slice {
@@ -218,7 +224,7 @@ class Slice {
   // check if slice is any Number-type object
   bool isNumber() const throw() { return isInteger() || isDouble(); }
 
-  bool isSorted() const throw() {
+  bool isHashed() const throw() {
     auto const h = head();
     return (h >= 0x0b && h <= 0x0e);
   }
@@ -314,14 +320,6 @@ class Slice {
   // name
   // - 0x0e      : object with 8-byte index table entries, sorted by attribute
   // name
-  // - 0x0f      : object with 1-byte index table entries, not sorted by
-  // attribute name
-  // - 0x10      : object with 2-byte index table entries, not sorted by
-  // attribute name
-  // - 0x11      : object with 4-byte index table entries, not sorted by
-  // attribute name
-  // - 0x12      : object with 8-byte index table entries, not sorted by
-  // attribute name
   Slice keyAt(ValueLength index, bool translate = true) const {
     if (!isObject()) {
       throw Exception(Exception::InvalidValueType, "Expecting type Object");
@@ -789,7 +787,7 @@ class Slice {
   ValueLength getNthOffsetFromCompact(ValueLength index) const;
 
   inline ValueLength indexEntrySize(uint8_t head) const throw() {
-    VELOCYPACK_ASSERT(head <= 0x12);
+    VELOCYPACK_ASSERT(head <= 0x0e);
     return static_cast<ValueLength>(WidthMap[head]);
   }
 

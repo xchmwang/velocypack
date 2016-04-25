@@ -1,3 +1,12 @@
+Cuckoo-Revolution
+-----------------
+
+* checkAttributeUniqueness (remove switch?)
+* delete sorting attributes
+* repair tests
+* debug lookup
+* check performance
+
 Documentation
 -------------
 * write Performance.md section for speed tests

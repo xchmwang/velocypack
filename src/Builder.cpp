@@ -844,6 +844,7 @@ uint8_t* Builder::set(ValuePair const& pair) {
                   "ValueType::Custom are valid for ValuePair argument");
 }
 
+#if 0
 void Builder::checkAttributeUniqueness(Slice const& obj) const {
   VELOCYPACK_ASSERT(options->checkAttributeUniqueness == true);
   ValueLength const n = obj.length();
@@ -886,6 +887,7 @@ void Builder::checkAttributeUniqueness(Slice const& obj) const {
     }
   }
 }
+#endif
 
 uint8_t* Builder::add(std::string const& attrName, Value const& sub) {
   return addInternal<Value>(attrName, sub);
@@ -955,12 +957,6 @@ uint8_t* Builder::add(ArrayIterator&& sub) {
   return _start + oldPos;
 }
 
-static inline uint32_t fastModulo32Bit(ValueLength a, ValueLength b) {
-  uint32_t aa = static_cast<uint32_t>((a >> 32) ^ a);
-  uint32_t bb = static_cast<uint32_t>(b);
-  return aa % bb;
-}
-
 bool Builder::cuckooInsert(std::vector<ValueLength>& ht, ValueLength nrSlots,
                            uint8_t seed, uint8_t* objStart, ValueLength offset,
                            bool small) {
@@ -1007,7 +1003,7 @@ ValueLength Builder::computeCuckooHash(std::vector<ValueLength>& ht,
     seed = 0;
     do {
       // Will be left by return as soon as successful
-      bool small = nrSlots <= 0xffffffff;
+      bool small = nrSlots <= 0x1000000;
       
       // Initialize empty hash table of given size:
       ht.clear();
