@@ -424,6 +424,12 @@ private:
   // close for the array case:
   Builder& closeArray(ValueLength tos, std::vector<ValueLength>& index);
 
+  bool cuckooInsert(std::vector<ValueLength>& ht, ValueLength nrSlots,
+                    uint8_t seed, uint8_t* objStart, ValueLength offset,
+                    bool small);
+
+  ValueLength computeCuckooHash(std::vector<ValueLength>& ht, uint8_t& seed);
+
   void addNull() {
     reserveSpace(1);
     _start[_pos++] = 0x18;

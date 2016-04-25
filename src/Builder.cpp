@@ -382,19 +382,24 @@ Builder& Builder::close() {
   // fix head byte in case a compact Array / Object was originally requested
   _start[tos] = 0x0b;
 
+  // Now create the hash table to see how long the object will actually be:
+  std::vector<ValueLength> ht;
+  uint8_t seed;
+  ValueLength nrSlots = computeCuckooHash(ht, seed);
+
   // First determine byte length and its format:
   unsigned int offsetSize;
   // can be 1, 2, 4 or 8 for the byte width of the offsets,
   // the byte length and the number of subvalues:
-  if (_pos - tos + index.size() - 6 <= 0xff) {
+  if (_pos - tos + nrSlots - 4 <= 0xff) {
     // We have so far used _pos - tos bytes, including the reserved 8
     // bytes for byte length and number of subvalues. In the 1-byte number
-    // case we would win back 6 bytes but would need one byte per subvalue
+    // case we would win back 4 bytes but would need one byte per subvalue
     // for the index table
     offsetSize = 1;
-  } else if (_pos - tos + 2 * index.size() <= 0xffff) {
+  } else if (_pos - tos + 2 * nrSlots <= 0xffff) {
     offsetSize = 2;
-  } else if (_pos - tos + 4 * index.size() <= 0xffffffffu) {
+  } else if (_pos - tos + 4 * nrSlots <= 0xffffffffu) {
     offsetSize = 4;
   } else {
     offsetSize = 8;
@@ -402,7 +407,7 @@ Builder& Builder::close() {
 
   // Maybe we need to move down data:
   if (offsetSize == 1) {
-    ValueLength targetPos = 3;
+    ValueLength targetPos = 5;
     if (_pos > (tos + 9)) {
       ValueLength len = _pos - (tos + 9);
       memmove(_start + tos + targetPos, _start + tos + 9, checkOverflow(len));
@@ -413,24 +418,24 @@ Builder& Builder::close() {
     for (size_t i = 0; i < n; i++) {
       index[i] -= diff;
     }
+    for (size_t i = 0; i < nrSlots; ++i) {
+      if (ht[i] != 0) {
+        ht[i] -= diff;
+      }
+    }
   }
   // One could move down things in the offsetSize == 2 case as well,
-  // since we only need 4 bytes in the beginning. However, saving these
-  // 4 bytes has been sacrificed on the Altar of Performance.
+  // since we only need 7 bytes in the beginning. However, saving these
+  // 1 byte has been sacrificed on the Altar of Performance.
 
   // Now build the table:
   ValueLength tableBase;
-  reserveSpace(offsetSize * index.size() + (offsetSize == 8 ? 8 : 0));
+  reserveSpace(offsetSize * nrSlots + (offsetSize == 8 ? 8 : 0));
   tableBase = _pos;
-  _pos += offsetSize * index.size();
+  _pos += offsetSize * nrSlots;
   // Object
-  if (!options->sortAttributeNames) {
-    _start[tos] = 0x0f;  // unsorted
-  } else if (index.size() >= 2 && options->sortAttributeNames) {
-    sortObjectIndex(_start + tos, index);
-  }
-  for (size_t i = 0; i < index.size(); i++) {
-    uint64_t x = index[i];
+  for (size_t i = 0; i < nrSlots; i++) {
+    uint64_t x = ht[i];
     for (size_t j = 0; j < offsetSize; j++) {
       _start[tableBase + offsetSize * i + j] = x & 0xff;
       x >>= 8;
@@ -439,12 +444,16 @@ Builder& Builder::close() {
   // Finally fix the byte width in the type byte:
   if (offsetSize > 1) {
     if (offsetSize == 2) {
-      _start[tos] += 1;
+      _start[tos] = 0x0c;
     } else if (offsetSize == 4) {
-      _start[tos] += 2;
+      _start[tos] = 0x0d;
+      appendLength(nrSlots, 4);
+      appendLength(seed, 1);
     } else {  // offsetSize == 8
-      _start[tos] += 3;
+      _start[tos] = 0x0e;
       appendLength(index.size(), 8);
+      appendLength(nrSlots, 8);
+      appendLength(seed, 1);
     }
   }
 
@@ -455,18 +464,21 @@ Builder& Builder::close() {
     x >>= 8;
   }
 
+  // Add number of entries, nrSlots and seed, if they are in the front:
   if (offsetSize < 8) {
     x = index.size();
     for (unsigned int i = offsetSize + 1; i <= 2 * offsetSize; i++) {
       _start[tos + i] = x & 0xff;
       x >>= 8;
     }
-  }
-
-  // And, if desired, check attribute uniqueness:
-  if (options->checkAttributeUniqueness && index.size() > 1) {
-    // check uniqueness of attribute names
-    checkAttributeUniqueness(Slice(_start + tos));
+    if (offsetSize < 4)
+      x = nrSlots;
+    unsigned int base = (offsetSize == 1) ? 3 : 5;
+    for (unsigned int i = base; i < base + offsetSize; i++) {
+      _start[tos + i ] = x & 0xff;
+      x >>= 8;
+    }
+    _start[base + offsetSize] = seed;
   }
 
   // Now the array or object is complete, we pop a ValueLength
@@ -941,6 +953,81 @@ uint8_t* Builder::add(ArrayIterator&& sub) {
     sub.next();
   }
   return _start + oldPos;
+}
+
+static inline uint32_t fastModulo32Bit(ValueLength a, ValueLength b) {
+  uint32_t aa = static_cast<uint32_t>((a >> 32) ^ a);
+  uint32_t bb = static_cast<uint32_t>(b);
+  return aa % bb;
+}
+
+bool Builder::cuckooInsert(std::vector<ValueLength>& ht, ValueLength nrSlots,
+                           uint8_t seed, uint8_t* objStart, ValueLength offset,
+                           bool small) {
+  ValueLength count = 3 * nrSlots;
+  uint32_t i = 0;
+  do {
+    // Compute all three hash values:
+    ValueLength pos[3];
+    ValueLength attrLen;
+    uint8_t const* attrName = findAttrName(objStart + offset, attrLen);
+    fasthash64x3(attrName, attrLen, Slice::seedTable + 3 * seed, pos);
+    pos[0] = small ? fastModulo32Bit(pos[0], nrSlots) : pos[0] % nrSlots;
+    if (ht[pos[0]] == 0) {
+      ht[pos[0]] = offset;
+      return true;
+    }
+    pos[1] = small ? fastModulo32Bit(pos[1], nrSlots) : pos[1] % nrSlots;
+    if (ht[pos[1]] == 0) {
+      ht[pos[1]] = offset;
+      return true;
+    }
+    pos[2] = small ? fastModulo32Bit(pos[2], nrSlots) : pos[2] % nrSlots;
+    if (ht[pos[2]] == 0) {
+      ht[pos[2]] = offset;
+      return true;
+    }
+    i = fastModulo32Bit(pos[i], 3);
+    ValueLength tmp = ht[pos[i]];
+    ht[pos[i]] = offset;
+    offset = tmp;
+  } while (count-- > 0);
+  return false;
+}
+
+ValueLength Builder::computeCuckooHash(std::vector<ValueLength>& ht,
+                                       uint8_t& seed) {
+  ValueLength tos = _stack.back();
+  std::vector<ValueLength> const& index = _index[_stack.size() - 1];
+  // The following is heuristics: We add one slot for sizes 2 to 6,
+  // then 2 for sizes 7 to 13 and so on:
+  ValueLength nrSlots = index.size() + (index.size() * 3) / 20 + 1;
+
+  while (true) {   // outer loop to try table sizes
+    seed = 0;
+    do {
+      // Will be left by return as soon as successful
+      bool small = nrSlots <= 0xffffffff;
+      
+      // Initialize empty hash table of given size:
+      ht.clear();
+      ht.reserve(nrSlots);
+      ht.insert(ht.begin(), nrSlots, 0);
+      bool error = false;
+      for (size_t i = 0; i < index.size(); i++) {
+        if (!cuckooInsert(ht, nrSlots, seed, _start + tos, index[i], small)) {
+          error = true;
+          break;
+        }
+      }
+      if (!error) {
+        return nrSlots;
+      }
+      seed++;
+    } while (seed != 0);
+    nrSlots = nrSlots * 110 / 100;
+  }
+  // never reached
 }
 
 static_assert(sizeof(double) == 8, "double is not 8 bytes");

@@ -47,6 +47,7 @@ namespace velocypack {
 
 // forward for fasthash64 function declared elsewhere
 uint64_t fasthash64(void const*, size_t, uint64_t);
+void fasthash64x3(void const*, size_t, uint64_t const*, uint64_t*);
 
 class SliceScope;
 
@@ -745,6 +746,8 @@ class Slice {
   std::string toJson(Options const* options = &Options::Defaults) const;
   std::string toString(Options const* options = &Options::Defaults) const;
   std::string hexType() const;
+
+  static ValueLength const seedTable[3 * 256];
 
  private:
   // return the value for a UInt object, without checks

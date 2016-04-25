@@ -78,5 +78,59 @@ uint64_t fasthash64(const void *buf, size_t len, uint64_t seed) {
   return mix(h);
 }
 
+// Compute three at a time for cuckoo hash to take advantage of multiple
+// arithmetic units:
+
+void fasthash64x3(const void *buf, size_t len,
+                  uint64_t const* seeds, uint64_t* h) {
+  const uint64_t m = 0x880355f21e6d1965ULL;
+  const uint64_t *pos = (const uint64_t *)buf;
+  const uint64_t *end = pos + (len / 8);
+  const unsigned char *pos2;
+  h[0] = seeds[0] ^ (len * m);
+  h[1] = seeds[1] ^ (len * m);
+  h[2] = seeds[2] ^ (len * m);
+  uint64_t v;
+
+  while (pos != end) {
+    v = *pos++;
+    h[0] ^= mix(v);
+    h[1] ^= mix(v);
+    h[2] ^= mix(v);
+    h[0] *= m;
+    h[1] *= m;
+    h[2] *= m;
+  }
+
+  pos2 = (const unsigned char *)pos;
+  v = 0;
+
+  switch (len & 7) {
+    case 7:
+      v ^= (uint64_t)pos2[6] << 48;
+    case 6:
+      v ^= (uint64_t)pos2[5] << 40;
+    case 5:
+      v ^= (uint64_t)pos2[4] << 32;
+    case 4:
+      v ^= (uint64_t)pos2[3] << 24;
+    case 3:
+      v ^= (uint64_t)pos2[2] << 16;
+    case 2:
+      v ^= (uint64_t)pos2[1] << 8;
+    case 1:
+      v ^= (uint64_t)pos2[0];
+      h[0] ^= mix(v);
+      h[1] ^= mix(v);
+      h[2] ^= mix(v);
+      h[0] *= m;
+      h[1] *= m;
+      h[2] *= m;
+  }
+  h[0] = mix(h[0]);
+  h[1] = mix(h[1]);
+  h[2] = mix(h[2]);
+}
+
 }  // namespace arangodb::velocypack
 }  // namespace arangodb
