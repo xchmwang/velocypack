@@ -48,14 +48,7 @@ reference, for arrays and objects see below for details:
                 attribute name, 4-byte bytelen and # subvals
   - 0x0e      : object with 8-byte index table offsets, cuckoo hashed by
                 attribute name, 8-byte bytelen and # subvals
-  - 0x0f      : object with 1-byte index table offsets, not sorted or hashed
-                1-byte bytelen and # subvals
-  - 0x10      : object with 2-byte index table offsets, not sorted or hashed
-                2-byte bytelen and # subvals
-  - 0x11      : object with 4-byte index table offsets, not sorted or hashed
-                4-byte bytelen and # subvals
-  - 0x12      : object with 8-byte index table offsets, not sorted or hashed
-                8-byte bytelen and # subvals
+  - 0x0f-0x12 : unused
   - 0x13      : compact array, no index table
   - 0x14      : compact object, no index table
   - 0x15-0x16 : reserved
@@ -380,79 +373,6 @@ subvalues, or with type 0x09 and 8-byte numbers.
 
 Note that it is not recommended to encode short arrays with too long
 index tables.
-
-### Non-hashed Objects
-
-We next describe the type cases 0x0f to 0x12, see below for the
-the special compact type 0x14.
-
-    0x0f-0x11
-    BYTELENGTH (1, 2 or 4 bytes)
-    NRITEMS (1, 2 or 4 bytes)
-    UNUSED (4 bytes, only in the 2 bytes case)
-    sub VPack values as pairs of attribute and value
-    INDEXTABLE (each entry 1, 2 or 4 bytes)
-
-    0x12
-    BYTELENGTH (8 bytes)
-    sub VPack values as pairs of attribute and value
-    INDEXTABLE (each entry 8 bytes)
-    NRITEMS (8 bytes)
-
-Numbers (for byte length, number of subvalues and offsets in the
-INDEXTABLE) are little endian unsigned integers, using 1 byte for type
-0x0f, 2 bytes for type 0x10, 4 bytes for type 0x11, and 8 bytes for type
-0x12.
-
-NRITEMS is a single number as described above.
-
-The INDEXTABLE consists of NRITEMS entries:
-
-  - an array of offsets (unaligned, in the number format described
-    above) earlier offsets reside at lower addresses.
-    Offsets are measured from the beginning of the VPack value.
-    Value 0 does not occur.
-
-Objects have a small header including their byte length, the number of
-subvalues, followed by all the subvalues and finally an index table
-containing offsets to the subvalues. The header is either 2 or 8 bytes
-long, and in the 8 byte case), the NRITEMS follows behind the index
-table.
-
-To find the index table, find the end of the object, the number of
-items, and from that the base of the index table, considering how wide
-its entries are.
-
-For all types the offset table describes where the subvalues reside.
-All offsets are measured from base A.
-
-The format of the key/value pairs for the subvalues are exactly as in
-the types 0x0b to 0x0e.
-
-The offset table simply lists all the offsets of all subvalues. There is
-one special case, if there is exactly one entry, then the offset table
-is omitted.
-
-Example: the object `{"a": 12, "b": true, "c": "xyz"}` can have the hexdump:
-
-    0f
-    15 03
-    41 62 1a
-    41 61 28 0c
-    41 63 43 78 79 7a
-    03 06 08
-
-The same object could have been done with an index table with longer
-entries, as in this example:
-
-    11
-    22 00 00 00
-    03 00 00 00
-    41 62 03
-    41 61 28 0c
-    41 63 43 78 79 7a
-    09 00 00 00 0c 00 00 00 10 00 00 00
-
 
 ### Special compact Objects
 
