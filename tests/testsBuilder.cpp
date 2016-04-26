@@ -2193,68 +2193,18 @@ TEST(BuilderTest, AttributeTranslations) {
   ValueLength len = b.size();
 
   static uint8_t correctResult[] = {
-      0x0f, 0x35, 0x08, 0x31, 0x1a, 0x32, 0x19, 0x33, 0x31, 0x44, 0x62,
-      0x61, 0x72, 0x74, 0x32, 0x34, 0x20, 0x2a, 0x35, 0x20, 0x13, 0x4b,
-      0x6d, 0xc3, 0xb6, 0x74, 0xc3, 0xb6, 0x72, 0x68, 0x65, 0x61, 0x64,
-      0x20, 0x14, 0x47, 0x71, 0x75, 0x65, 0x74, 0x7a, 0x61, 0x6c, 0x20,
-      0x15, 0x03, 0x05, 0x07, 0x09, 0x0f, 0x12, 0x15, 0x23};
+      0x0b, 0x39, 0x08, 0x0a, 0x00, 0x31, 0x1a, 0x32, 
+      0x19, 0x33, 0x31, 0x44, 0x62, 0x61, 0x72, 0x74,
+      0x32, 0x34, 0x20, 0x2a, 0x35, 0x20, 0x13, 0x4b,
+      0x6d, 0xc3, 0xb6, 0x74, 0xc3, 0xb6, 0x72, 0x68,
+      0x65, 0x61, 0x64, 0x20, 0x14, 0x47, 0x71, 0x75,
+      0x65, 0x74, 0x7a, 0x61, 0x6c, 0x20, 0x15, 0x17,
+      0x0b, 0x07, 0x25, 0x00, 0x09, 0x05, 0x11, 0x14,
+      0x00};
 
   ASSERT_EQ(sizeof(correctResult), len);
   ASSERT_EQ(0, memcmp(result, correctResult, len));
 
-  Slice s = b.slice();
-
-  ASSERT_TRUE(s.hasKey("foo"));
-  ASSERT_TRUE(s.hasKey("bar"));
-  ASSERT_TRUE(s.hasKey("baz"));
-  ASSERT_TRUE(s.hasKey("bart"));
-  ASSERT_TRUE(s.hasKey("bark"));
-  ASSERT_TRUE(s.hasKey("mötör"));
-  ASSERT_TRUE(s.hasKey("mötörhead"));
-  ASSERT_TRUE(s.hasKey("quetzal"));
-}
-
-TEST(BuilderTest, AttributeTranslationsSorted) {
-  std::unique_ptr<AttributeTranslator> translator(new AttributeTranslator);
-
-  translator->add("foo", 1);
-  translator->add("bar", 2);
-  translator->add("baz", 3);
-  translator->add("bark", 4);
-  translator->add("mötör", 5);
-  translator->add("quetzalcoatl", 6);
-  translator->seal();
-  
-  AttributeTranslatorScope scope(translator.get());
-
-  Options options;
-  options.attributeTranslator = translator.get();
-
-  Builder b(&options);
-  b.add(Value(ValueType::Object));
-  b.add("foo", Value(true));
-  b.add("bar", Value(false));
-  b.add("baz", Value(1));
-  b.add("bart", Value(2));
-  b.add("bark", Value(42));
-  b.add("mötör", Value(19));
-  b.add("mötörhead", Value(20));
-  b.add("quetzal", Value(21));
-  b.close();
-
-  uint8_t* result = b.start();
-  ValueLength len = b.size();
-
-  static uint8_t correctResult[] = {
-      0x0b, 0x35, 0x08, 0x31, 0x1a, 0x32, 0x19, 0x33, 0x31, 0x44, 0x62,
-      0x61, 0x72, 0x74, 0x32, 0x34, 0x20, 0x2a, 0x35, 0x20, 0x13, 0x4b,
-      0x6d, 0xc3, 0xb6, 0x74, 0xc3, 0xb6, 0x72, 0x68, 0x65, 0x61, 0x64,
-      0x20, 0x14, 0x47, 0x71, 0x75, 0x65, 0x74, 0x7a, 0x61, 0x6c, 0x20,
-      0x15, 0x05, 0x0f, 0x09, 0x07, 0x03, 0x12, 0x15, 0x23};
-
-  ASSERT_EQ(sizeof(correctResult), len);
-
-  ASSERT_EQ(0, memcmp(result, correctResult, len));
   Slice s = b.slice();
 
   ASSERT_TRUE(s.hasKey("foo"));
@@ -2509,7 +2459,7 @@ TEST(BuilderTest, AddKeysSeparately1) {
   b.add(Value("firstName"));
   b.add(Value("Max"));
   b.close();
-  ASSERT_EQ(R"({"firstName":"Max","name":"Neunhoeffer"})", b.toJson());
+  ASSERT_EQ(R"({"name":"Neunhoeffer","firstName":"Max"})", b.toJson());
 }
 
 TEST(BuilderTest, AddKeysSeparately2) {
@@ -2535,7 +2485,7 @@ TEST(BuilderTest, AddKeysSeparately2) {
   Parser p(b, &options);
   p.parse("[13]");
   b.close();
-  ASSERT_EQ(R"({"bar":{},"baz":1,"bumm":[13],"foo":[]})", b.toJson());
+  ASSERT_EQ(R"({"foo":[],"bar":{},"baz":1,"bumm":[13]})", b.toJson());
 }
 
 TEST(BuilderTest, AddKeysSeparatelyFail) {
