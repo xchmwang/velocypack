@@ -429,6 +429,7 @@ private:
                     bool small);
 
   ValueLength computeCuckooHash(std::vector<ValueLength>& ht, uint8_t& seed);
+  ValueLength computeCuckooHash2(std::vector<ValueLength>& ht, uint8_t& seed);
 
   void addNull() {
     reserveSpace(1);

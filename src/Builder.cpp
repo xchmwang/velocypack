@@ -1029,4 +1029,102 @@ ValueLength Builder::computeCuckooHash(std::vector<ValueLength>& ht,
   // never reached
 }
 
+ValueLength Builder::computeCuckooHash2(std::vector<ValueLength>& ht,
+                                       uint8_t& seed) {
+  std::mt19937_64 e(123456789);
+  std::uniform_int_distribution<uint8_t> d(0,2);
+  ValueLength count = 0;
+
+  ValueLength tos = _stack.back();
+  std::vector<ValueLength> const& index = _index[_stack.size() - 1];
+  // The following is heuristics: We add one slot for sizes 2 to 6,
+  // then 2 for sizes 7 to 13 and so on:
+  ValueLength nrSlots = index.size() + (index.size() * 3) / 20 + 1;
+  bool small = nrSlots <= 0x1000000;
+
+  std::vector<ValueLength> orbit;
+  std::vector<ValueLength> back;
+  std::vector<bool> inorbit;
+
+  auto insert = [&](uint8_t* objStart, ValueLength offset) {
+    orbit.clear();
+    orbit.push_back(UINT64_MAX);
+    back.clear();
+    back.push_back(UINT64_MAX);
+    inorbit.clear();
+    inorbit.insert(inorbit.begin(), nrSlots, false);
+    ValueLength i = 0;
+    bool found = false;
+    do {
+      if (i >= orbit.size() || orbit.size() > (std::min)(256UL, nrSlots / 2)) {
+        return false;
+      }
+      // Compute all three hash values:
+      ValueLength off = (i == 0) ? offset : ht[orbit[i]];
+      ValueLength pos[3];
+      ValueLength attrLen;
+      uint8_t const* attrName = findAttrName(objStart + off, attrLen);
+      fasthash64x3(attrName, attrLen, Slice::seedTable + 3 * seed, pos);
+      
+      for (uint8_t j = 0; j <= 2; ++j) {
+        ValueLength newPos 
+            = small ? fastModulo32Bit(pos[j], nrSlots) : pos[j] % nrSlots;
+        if (!inorbit[newPos]) {
+          orbit.push_back(newPos);
+          inorbit[newPos] = true;
+          back.push_back(i);
+          if (ht[newPos] == 0) {
+            found = true;
+            if (i > 20) {
+              std::cout << "Looked at " << i << " slots." << std::endl;
+            }
+            break;
+          }
+        }
+      }
+      ++count;
+      ++i;
+    } while (!found);
+    // Play cuckoo:
+    i = orbit.size() - 1;
+    ValueLength j = back[i];
+    while (j > 0) {
+      ht[orbit[i]] = ht[orbit[j]];
+      i = j;
+      j = back[i];
+    }
+    ht[orbit[i]] = offset;
+    return true;
+  };
+
+  std::cout << "Size: " << index.size() << std::endl;
+  while (true) {   // outer loop to try table sizes
+    seed = 0;
+    do {
+      // Will be left by return as soon as successful
+      
+      // Initialize empty hash table of given size:
+      ht.clear();
+      ht.reserve(nrSlots);
+      ht.insert(ht.begin(), nrSlots, 0);
+      bool error = false;
+      for (size_t i = 0; i < index.size(); i++) {
+        if (!insert(_start + tos, index[i])) {
+          error = true;
+          break;
+        }
+      }
+      if (!error) {
+        std::cout << "Seed:" << (int) seed << " " << count << std::endl;
+        return nrSlots;
+      }
+      seed++;
+    } while (seed != 0);
+    nrSlots = nrSlots * 110 / 100;
+    small = nrSlots <= 0x1000000;
+    std::cout << "nrSlots:" << nrSlots << std::endl;
+  }
+  // never reached
+}
+
 static_assert(sizeof(double) == 8, "double is not 8 bytes");
