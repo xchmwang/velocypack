@@ -25,7 +25,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 #include <unordered_set>
-#include <iostream>
+//#include <iostream>
 #include <random>
 
 #include "velocypack/velocypack-common.h"
@@ -964,7 +964,6 @@ ValueLength Builder::computeCuckooHash(std::vector<ValueLength>& ht,
                                        uint8_t& seed) {
   std::mt19937_64 e(123456789);
   std::uniform_int_distribution<uint8_t> d(0,2);
-  ValueLength count = 0;
 
   ValueLength tos = _stack.back();
   std::vector<ValueLength> const& index = _index[_stack.size() - 1];
@@ -983,23 +982,21 @@ ValueLength Builder::computeCuckooHash(std::vector<ValueLength>& ht,
       fasthash64x3(attrName, attrLen, Slice::seedTable + 3 * seed, pos);
       
       pos[0] = small ? fastModulo32Bit(pos[0], nrSlots) : pos[0] % nrSlots;
-      if (ht[pos[0]] == 0) { ht[pos[0]] = offset; if (count2 > 20) { std::cout << "Count2:" << count2 << std::endl; } return true; }
+      if (ht[pos[0]] == 0) { ht[pos[0]] = offset; return true; }
       pos[1] = small ? fastModulo32Bit(pos[1], nrSlots) : pos[1] % nrSlots;
-      if (ht[pos[1]] == 0) { ht[pos[1]] = offset; if (count2 > 20) { std::cout << "Count2:" << count2 << std::endl; } return true; }
+      if (ht[pos[1]] == 0) { ht[pos[1]] = offset; return true; }
       pos[2] = small ? fastModulo32Bit(pos[2], nrSlots) : pos[2] % nrSlots;
-      if (ht[pos[2]] == 0) { ht[pos[2]] = offset; if (count2 > 20) { std::cout << "Count2:" << count2 << std::endl; } return true; }
+      if (ht[pos[2]] == 0) { ht[pos[2]] = offset; return true; }
 
       // Play cuckoo:
       uint8_t i = d(e);
       ValueLength tmp = ht[pos[i]];
       ht[pos[i]] = offset;
       offset = tmp;
-      ++count;
     } while (++count2 <= (std::min)(256UL, 3 * nrSlots));
     return false;
   };
 
-  std::cout << "Size: " << index.size() << std::endl;
   while (true) {   // outer loop to try table sizes
     seed = 0;
     do {
@@ -1017,14 +1014,12 @@ ValueLength Builder::computeCuckooHash(std::vector<ValueLength>& ht,
         }
       }
       if (!error) {
-        std::cout << "Seed:" << (int) seed << " " << count << std::endl;
         return nrSlots;
       }
       seed++;
     } while (seed != 0);
     nrSlots = nrSlots * 110 / 100;
     small = nrSlots <= 0x1000000;
-    std::cout << "nrSlots:" << nrSlots << std::endl;
   }
   // never reached
 }
@@ -1033,7 +1028,6 @@ ValueLength Builder::computeCuckooHash2(std::vector<ValueLength>& ht,
                                        uint8_t& seed) {
   std::mt19937_64 e(123456789);
   std::uniform_int_distribution<uint8_t> d(0,2);
-  ValueLength count = 0;
 
   ValueLength tos = _stack.back();
   std::vector<ValueLength> const& index = _index[_stack.size() - 1];
@@ -1075,14 +1069,10 @@ ValueLength Builder::computeCuckooHash2(std::vector<ValueLength>& ht,
           back.push_back(i);
           if (ht[newPos] == 0) {
             found = true;
-            if (i > 20) {
-              std::cout << "Looked at " << i << " slots." << std::endl;
-            }
             break;
           }
         }
       }
-      ++count;
       ++i;
     } while (!found);
     // Play cuckoo:
@@ -1097,7 +1087,6 @@ ValueLength Builder::computeCuckooHash2(std::vector<ValueLength>& ht,
     return true;
   };
 
-  std::cout << "Size: " << index.size() << std::endl;
   while (true) {   // outer loop to try table sizes
     seed = 0;
     do {
@@ -1115,14 +1104,12 @@ ValueLength Builder::computeCuckooHash2(std::vector<ValueLength>& ht,
         }
       }
       if (!error) {
-        std::cout << "Seed:" << (int) seed << " " << count << std::endl;
         return nrSlots;
       }
       seed++;
     } while (seed != 0);
     nrSlots = nrSlots * 110 / 100;
     small = nrSlots <= 0x1000000;
-    std::cout << "nrSlots:" << nrSlots << std::endl;
   }
   // never reached
 }
