@@ -158,7 +158,7 @@ class ObjectIterator {
     }
 
     if (slice.length() > 0) {
-      _current = slice.keyAt(0, false).start();
+      _current = slice.start() + _slice.getFirstItemOffset();
     }
   }
 
@@ -245,11 +245,9 @@ class ObjectIterator {
     if (_position >= _size) {
       throw Exception(Exception::IndexOutOfBounds);
     }
-    if (_current != nullptr) {
-      Slice key = Slice(_current);
-      return Slice(_current + key.byteSize());
-    }
-    return _slice.valueAt(_position);
+    VELOCYPACK_ASSERT(_current != nullptr);
+    Slice key = Slice(_current);
+    return Slice(_current + key.byteSize());
   }
 
   inline bool next() throw() {
