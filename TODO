@@ -4,8 +4,9 @@ Cuckoo-Revolution
 * checkAttributeUniqueness (remove switch?)
 * delete sorting attributes
 * repair tests
-* debug lookup
 * check performance
+* empty attribute
+* repair tests testsSlice where vpacks are given
 
 Documentation
 -------------
