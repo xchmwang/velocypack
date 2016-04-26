@@ -26,9 +26,50 @@
 
 #include <ostream>
 #include <string>
-#include <iostream>
 
 #include "tests-common.h"
+
+TEST(BuilderTest, AvoidCollisionsInArangoDB) {
+  ValueLength hashes[5];
+  ValueLength dummy[3];
+  std::vector<std::string> st = {"_key", "_id", "_rev", "_from", "_to"};
+  for (size_t j = 0; j < st.size(); j++) {
+    fasthash64x3(st[j].c_str(), st[j].size(), Slice::seedTable, dummy);
+    hashes[j] = dummy[0];
+  }
+  for (size_t i = 6; i < 100; i++) {
+    ValueLength slots[3];
+    slots[0] = hashes[0] % i;
+    slots[1] = hashes[1] % i;
+    slots[2] = hashes[2] % i;
+    slots[3] = hashes[3] % i;
+    slots[4] = hashes[4] % i;
+    ASSERT_TRUE(slots[0] != slots[1]);
+    ASSERT_TRUE(slots[0] != slots[2]);
+    ASSERT_TRUE(slots[0] != slots[3]);
+    ASSERT_TRUE(slots[0] != slots[4]);
+    ASSERT_TRUE(slots[1] != slots[2]);
+    ASSERT_TRUE(slots[1] != slots[3]);
+    ASSERT_TRUE(slots[1] != slots[4]);
+    ASSERT_TRUE(slots[2] != slots[3]);
+    ASSERT_TRUE(slots[2] != slots[4]);
+    ASSERT_TRUE(slots[3] != slots[4]);
+  }
+  st = {"_key", "_id", "_rev"};
+  for (size_t j = 0; j < st.size(); j++) {
+    fasthash64x3(st[j].c_str(), st[j].size(), Slice::seedTable, dummy);
+    hashes[j] = dummy[0];
+  }
+  for (size_t i = 4; i < 100; i++) {
+    ValueLength slots[3];
+    slots[0] = hashes[0] % i;
+    slots[1] = hashes[1] % i;
+    slots[2] = hashes[2] % i;
+    ASSERT_TRUE(slots[0] != slots[1]);
+    ASSERT_TRUE(slots[0] != slots[2]);
+    ASSERT_TRUE(slots[1] != slots[2]);
+  }
+}
 
 TEST(BuilderTest, ConstructWithBufferRef) {
   Builder b1;
@@ -1175,41 +1216,14 @@ TEST(BuilderTest, ObjectSorted) {
   ValueLength len = b.size();
 
   static uint8_t correctResult[] = {
-      0x0b, 0x20, 0x04, 0x41, 0x64, 0x29, 0xb0, 0x04,  // "d": uint(1200) =
-                                                       // 0x4b0
+      0x0b, 0x23, 0x04, 0x05, 0x00, 
+      0x41, 0x64, 0x29, 0xb0, 0x04,  // "d": uint(1200) = 0x4b0
       0x41, 0x63, 0x1b, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
       // "c": double(2.3)
       0x41, 0x62, 0x43, 0x61, 0x62, 0x63,  // "b": "abc"
       0x41, 0x61, 0x1a,                    // "a": true
-      0x19, 0x13, 0x08, 0x03};
-  dumpDouble(value, correctResult + 11);
-
-  ASSERT_EQ(sizeof(correctResult), len);
-  ASSERT_EQ(0, memcmp(result, correctResult, len));
-}
-
-TEST(BuilderTest, ObjectUnsorted) {
-  double value = 2.3;
-  Builder b;
-  b.add(Value(ValueType::Object));
-  b.add("d", Value(uint64_t(1200)));
-  b.add("c", Value(value));
-  b.add("b", Value("abc"));
-  b.add("a", Value(true));
-  b.close();
-
-  uint8_t* result = b.start();
-  ValueLength len = b.size();
-
-  static uint8_t correctResult[] = {
-      0x0f, 0x20, 0x04, 0x41, 0x64, 0x29, 0xb0, 0x04,  // "d": uint(1200) =
-                                                       // 0x4b0
-      0x41, 0x63, 0x1b, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-      // "c": double(2.3)
-      0x41, 0x62, 0x43, 0x61, 0x62, 0x63,  // "b": "abc"
-      0x41, 0x61, 0x1a,                    // "a": true
-      0x03, 0x08, 0x13, 0x19};
-  dumpDouble(value, correctResult + 11);
+      0x05, 0x00, 0x1b, 0x15, 0x0a };  // cuckoo hash table
+  dumpDouble(value, correctResult + 13);
 
   ASSERT_EQ(sizeof(correctResult), len);
   ASSERT_EQ(0, memcmp(result, correctResult, len));
