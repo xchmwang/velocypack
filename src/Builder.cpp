@@ -25,6 +25,8 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 #include <unordered_set>
+#include <iostream>
+#include <random>
 
 #include "velocypack/velocypack-common.h"
 #include "velocypack/Builder.h"
@@ -958,53 +960,50 @@ uint8_t* Builder::add(ArrayIterator&& sub) {
   return _start + oldPos;
 }
 
-bool Builder::cuckooInsert(std::vector<ValueLength>& ht, ValueLength nrSlots,
-                           uint8_t seed, uint8_t* objStart, ValueLength offset,
-                           bool small) {
-  ValueLength count = 3 * nrSlots;
-  uint32_t i = 0;
-  do {
-    // Compute all three hash values:
-    ValueLength pos[3];
-    ValueLength attrLen;
-    uint8_t const* attrName = findAttrName(objStart + offset, attrLen);
-    fasthash64x3(attrName, attrLen, Slice::seedTable + 3 * seed, pos);
-    pos[0] = small ? fastModulo32Bit(pos[0], nrSlots) : pos[0] % nrSlots;
-    if (ht[pos[0]] == 0) {
-      ht[pos[0]] = offset;
-      return true;
-    }
-    pos[1] = small ? fastModulo32Bit(pos[1], nrSlots) : pos[1] % nrSlots;
-    if (ht[pos[1]] == 0) {
-      ht[pos[1]] = offset;
-      return true;
-    }
-    pos[2] = small ? fastModulo32Bit(pos[2], nrSlots) : pos[2] % nrSlots;
-    if (ht[pos[2]] == 0) {
-      ht[pos[2]] = offset;
-      return true;
-    }
-    i = fastModulo32Bit(pos[i], 3);
-    ValueLength tmp = ht[pos[i]];
-    ht[pos[i]] = offset;
-    offset = tmp;
-  } while (count-- > 0);
-  return false;
-}
-
 ValueLength Builder::computeCuckooHash(std::vector<ValueLength>& ht,
                                        uint8_t& seed) {
+  std::mt19937_64 e(123456789);
+  std::uniform_int_distribution<uint8_t> d(0,2);
+  ValueLength count = 0;
+
   ValueLength tos = _stack.back();
   std::vector<ValueLength> const& index = _index[_stack.size() - 1];
   // The following is heuristics: We add one slot for sizes 2 to 6,
   // then 2 for sizes 7 to 13 and so on:
   ValueLength nrSlots = index.size() + (index.size() * 3) / 20 + 1;
+  bool small = nrSlots <= 0x1000000;
 
+  auto insert = [&](uint8_t* objStart, ValueLength offset) {
+    ValueLength count2 = 0;
+    do {
+      // Compute all three hash values:
+      ValueLength pos[3];
+      ValueLength attrLen;
+      uint8_t const* attrName = findAttrName(objStart + offset, attrLen);
+      fasthash64x3(attrName, attrLen, Slice::seedTable + 3 * seed, pos);
+      
+      pos[0] = small ? fastModulo32Bit(pos[0], nrSlots) : pos[0] % nrSlots;
+      if (ht[pos[0]] == 0) { ht[pos[0]] = offset; if (count2 > 20) { std::cout << "Count2:" << count2 << std::endl; } return true; }
+      pos[1] = small ? fastModulo32Bit(pos[1], nrSlots) : pos[1] % nrSlots;
+      if (ht[pos[1]] == 0) { ht[pos[1]] = offset; if (count2 > 20) { std::cout << "Count2:" << count2 << std::endl; } return true; }
+      pos[2] = small ? fastModulo32Bit(pos[2], nrSlots) : pos[2] % nrSlots;
+      if (ht[pos[2]] == 0) { ht[pos[2]] = offset; if (count2 > 20) { std::cout << "Count2:" << count2 << std::endl; } return true; }
+
+      // Play cuckoo:
+      uint8_t i = d(e);
+      ValueLength tmp = ht[pos[i]];
+      ht[pos[i]] = offset;
+      offset = tmp;
+      ++count;
+    } while (++count2 <= (std::min)(256UL, 3 * nrSlots));
+    return false;
+  };
+
+  std::cout << "Size: " << index.size() << std::endl;
   while (true) {   // outer loop to try table sizes
     seed = 0;
     do {
       // Will be left by return as soon as successful
-      bool small = nrSlots <= 0x1000000;
       
       // Initialize empty hash table of given size:
       ht.clear();
@@ -1012,17 +1011,20 @@ ValueLength Builder::computeCuckooHash(std::vector<ValueLength>& ht,
       ht.insert(ht.begin(), nrSlots, 0);
       bool error = false;
       for (size_t i = 0; i < index.size(); i++) {
-        if (!cuckooInsert(ht, nrSlots, seed, _start + tos, index[i], small)) {
+        if (!insert(_start + tos, index[i])) {
           error = true;
           break;
         }
       }
       if (!error) {
+        std::cout << "Seed:" << (int) seed << " " << count << std::endl;
         return nrSlots;
       }
       seed++;
     } while (seed != 0);
     nrSlots = nrSlots * 110 / 100;
+    small = nrSlots <= 0x1000000;
+    std::cout << "nrSlots:" << nrSlots << std::endl;
   }
   // never reached
 }
