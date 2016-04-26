@@ -175,7 +175,7 @@ Builder& Builder::closeEmptyArrayOrObject(ValueLength tos, bool isArray) {
 }
 
 bool Builder::closeCompactArrayOrObject(ValueLength tos, bool isArray,
-                                        std::vector<ValueLength>& index) {
+                                        std::vector<ValueLength> const& index) {
   // use compact notation
   ValueLength nLen =
       getVariableValueLength(static_cast<ValueLength>(index.size()));
@@ -349,7 +349,7 @@ Builder& Builder::close() {
   if (isClosed()) {
     throw Exception(Exception::BuilderNeedOpenCompound);
   }
-  ValueLength& tos = _stack.back();
+  ValueLength tos = _stack.back();
   uint8_t const head = _start[tos];
 
   VELOCYPACK_ASSERT(head == 0x06 || head == 0x0b || head == 0x13 ||
@@ -407,12 +407,11 @@ Builder& Builder::close() {
 
   // Maybe we need to move down data:
   if (offsetSize == 1) {
-    ValueLength targetPos = 5;
     if (_pos > (tos + 9)) {
       ValueLength len = _pos - (tos + 9);
-      memmove(_start + tos + targetPos, _start + tos + 9, checkOverflow(len));
+      memmove(_start + tos + 5, _start + tos + 9, checkOverflow(len));
     }
-    ValueLength const diff = 9 - targetPos;
+    ValueLength const diff = 4;
     _pos -= diff;
     size_t const n = index.size();
     for (size_t i = 0; i < n; i++) {
@@ -430,7 +429,8 @@ Builder& Builder::close() {
 
   // Now build the table:
   ValueLength tableBase;
-  reserveSpace(offsetSize * nrSlots + (offsetSize == 8 ? 8 : 0));
+  reserveSpace(offsetSize * nrSlots + (offsetSize == 8 ? 17 : 0)
+                                    + (offsetSize == 4 ? 5  : 0));
   tableBase = _pos;
   _pos += offsetSize * nrSlots;
   // Object
@@ -471,14 +471,15 @@ Builder& Builder::close() {
       _start[tos + i] = x & 0xff;
       x >>= 8;
     }
-    if (offsetSize < 4)
+    if (offsetSize < 4) {
       x = nrSlots;
-    unsigned int base = (offsetSize == 1) ? 3 : 5;
-    for (unsigned int i = base; i < base + offsetSize; i++) {
-      _start[tos + i ] = x & 0xff;
-      x >>= 8;
+      unsigned int base = (offsetSize == 1) ? 3 : 5;
+      for (unsigned int i = base; i < base + offsetSize; i++) {
+        _start[tos + i ] = x & 0xff;
+        x >>= 8;
+      }
+      _start[base + offsetSize] = seed;
     }
-    _start[base + offsetSize] = seed;
   }
 
   // Now the array or object is complete, we pop a ValueLength
