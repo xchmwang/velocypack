@@ -647,7 +647,7 @@ Slice Slice::get(std::string const& attribute) const {
     }
   }
   pos[2] = small ? fastModulo32Bit(pos[2], nrSlots) : pos[2] % nrSlots;
-  offset = readInteger<ValueLength>(_start + htBase + pos[1] * offsetSize,
+  offset = readInteger<ValueLength>(_start + htBase + pos[2] * offsetSize,
                                     offsetSize);
   if (offset != 0) {
     s = Slice(_start + offset);
