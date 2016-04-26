@@ -146,7 +146,7 @@ TEST(OutStreamTest, StringifyComplexObject) {
   std::ostringstream result;
   result << s;
 
-  ASSERT_EQ("[Slice object (0x0f), byteSize: 107]", result.str());
+  ASSERT_EQ("[Slice object (0x0b), byteSize: 113]", result.str());
 
   Options dumperOptions;
   dumperOptions.prettyPrint = true;
