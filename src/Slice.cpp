@@ -867,7 +867,7 @@ Slice Slice::getNthKey(ValueLength index, bool translate) const {
 
   ValueLength offset = getNthOffset(index);
   if (offset == 0) {
-    return nullSlice();
+    return noneSlice();
   }
 
   Slice s(_start + offset);

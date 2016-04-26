@@ -910,28 +910,15 @@ TEST(LookupTest, KeyAtObject) {
   std::shared_ptr<Builder> builder = parser.steal();
   Slice s(builder->start());
 
-  ASSERT_EQ("foo", s.keyAt(0).copyString());
-  ASSERT_EQ("bar", s.keyAt(1).copyString());
-  ASSERT_EQ("baz", s.keyAt(2).copyString());
-  ASSERT_EQ("qux", s.keyAt(3).copyString());
+  // The following depends on intricate details of the cuckoo hash:
+  ASSERT_EQ("baz", s.keyAt(0).copyString());
+  ASSERT_EQ("foo", s.keyAt(1).copyString());
+  ASSERT_EQ("bar", s.keyAt(2).copyString());
+  Slice ss = s.keyAt(3);
+  ASSERT_TRUE(ss.isNone());
+  ASSERT_EQ("qux", s.keyAt(4).copyString());
 
-  ASSERT_VELOCYPACK_EXCEPTION(s.keyAt(4), Exception::IndexOutOfBounds);
-}
-
-TEST(LookupTest, KeyAtObjectSorted) {
-  std::string const value("{\"foo\":1,\"bar\":2,\"baz\":3,\"qux\":4}");
-
-  Parser parser;
-  parser.parse(value);
-  std::shared_ptr<Builder> builder = parser.steal();
-  Slice s(builder->start());
-
-  ASSERT_EQ("bar", s.keyAt(0).copyString());
-  ASSERT_EQ("baz", s.keyAt(1).copyString());
-  ASSERT_EQ("foo", s.keyAt(2).copyString());
-  ASSERT_EQ("qux", s.keyAt(3).copyString());
-
-  ASSERT_VELOCYPACK_EXCEPTION(s.keyAt(4), Exception::IndexOutOfBounds);
+  ASSERT_VELOCYPACK_EXCEPTION(s.keyAt(5), Exception::IndexOutOfBounds);
 }
 
 TEST(LookupTest, KeyAtObjectCompact) {
@@ -997,28 +984,15 @@ TEST(LookupTest, ValueAtObject) {
   std::shared_ptr<Builder> builder = parser.steal();
   Slice s(builder->start());
 
-  ASSERT_EQ(1, s.valueAt(0).getInt());
-  ASSERT_EQ(2, s.valueAt(1).getInt());
-  ASSERT_EQ(3, s.valueAt(2).getInt());
-  ASSERT_EQ(4, s.valueAt(3).getInt());
+  // The following depends on intricate details of the cuckoo hash:
+  ASSERT_EQ(3, s.valueAt(0).getInt());
+  ASSERT_EQ(1, s.valueAt(1).getInt());
+  ASSERT_EQ(2, s.valueAt(2).getInt());
+  Slice ss = s.valueAt(3);
+  ASSERT_TRUE(ss.isNone());
+  ASSERT_EQ(4, s.valueAt(4).getInt());
 
-  ASSERT_VELOCYPACK_EXCEPTION(s.valueAt(4), Exception::IndexOutOfBounds);
-}
-
-TEST(LookupTest, ValueAtObjectSorted) {
-  std::string const value("{\"foo\":1,\"bar\":2,\"baz\":3,\"qux\":4}");
-
-  Parser parser;
-  parser.parse(value);
-  std::shared_ptr<Builder> builder = parser.steal();
-  Slice s(builder->start());
-
-  ASSERT_EQ(2, s.valueAt(0).getInt());
-  ASSERT_EQ(3, s.valueAt(1).getInt());
-  ASSERT_EQ(1, s.valueAt(2).getInt());
-  ASSERT_EQ(4, s.valueAt(3).getInt());
-
-  ASSERT_VELOCYPACK_EXCEPTION(s.valueAt(4), Exception::IndexOutOfBounds);
+  ASSERT_VELOCYPACK_EXCEPTION(s.valueAt(5), Exception::IndexOutOfBounds);
 }
 
 TEST(LookupTest, ValueAtObjectCompact) {
