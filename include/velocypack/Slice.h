@@ -748,10 +748,25 @@ class Slice {
   std::string toString(Options const* options = &Options::Defaults) const;
   std::string hexType() const;
 
- private:
+  ValueLength getFirstItemOffset() {
+    // Method for objects
+    VELOCYPACK_ASSERT(isObject());
+    uint8_t const* p = _start;
+    if (*p == 0x14) {
+      ValueLength offset = 1;
+      do {
+        ++p;
+        ++offset;
+      } while ((*p & 0x80) != 0);
+      return offset;
+    }
+    return FirstSubMap[*p];
+  }
+
   // Seed table for cuckoo hashes:
   static ValueLength const seedTable[3 * 256];
 
+ private:
   // return the value for a UInt object, without checks
   // returns 0 for invalid values/types
   uint64_t getUIntUnchecked() const;
