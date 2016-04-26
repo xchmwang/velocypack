@@ -334,6 +334,9 @@ class Slice {
     }
 
     Slice key = getNthKey(index, false);
+    if (key.isNone()) {
+      return key;
+    }
     return Slice(key.start() + key.byteSize());
   }
 

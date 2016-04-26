@@ -157,7 +157,7 @@ class ObjectIterator {
       throw Exception(Exception::InvalidValueType, "Expecting Object slice");
     }
 
-    if (slice.head() == 0x14 && slice.length() > 0) {
+    if (slice.length() > 0) {
       _current = slice.keyAt(0, false).start();
     }
   }
@@ -206,7 +206,7 @@ class ObjectIterator {
       Slice key = Slice(_current);
       return ObjectPair(key, Slice(_current + key.byteSize()));
     }
-    return ObjectPair(_slice.keyAt(_position), _slice.valueAt(_position));
+    return ObjectPair(Slice::noneSlice(), Slice::noneSlice());
   }
 
   ObjectIterator begin() { return ObjectIterator(_slice); }
@@ -216,12 +216,14 @@ class ObjectIterator {
   ObjectIterator end() {
     auto it = ObjectIterator(_slice);
     it._position = it._size;
+    it._current = nullptr;
     return it;
   }
 
   ObjectIterator end() const {
     auto it = ObjectIterator(_slice);
     it._position = it._size;
+    it._current = nullptr;
     return it;
   }
 
@@ -231,10 +233,12 @@ class ObjectIterator {
     if (_position >= _size) {
       throw Exception(Exception::IndexOutOfBounds);
     }
-    if (_current != nullptr) {
-      return Slice(_current);
+    VELOCYPACK_ASSERT(_current != nullptr);
+    Slice s(_current);
+    if (translate) {
+      s = s.makeKey();
     }
-    return _slice.keyAt(_position, translate);
+    return s;
   }
 
   inline Slice value() const {

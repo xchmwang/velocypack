@@ -865,7 +865,12 @@ Slice Slice::getNth(ValueLength index) const {
 Slice Slice::getNthKey(ValueLength index, bool translate) const {
   VELOCYPACK_ASSERT(type() == ValueType::Object);
 
-  Slice s(_start + getNthOffset(index));
+  ValueLength offset = getNthOffset(index);
+  if (offset == 0) {
+    return nullSlice();
+  }
+
+  Slice s(_start + offset);
 
   if (translate) {
     return s.makeKey();
