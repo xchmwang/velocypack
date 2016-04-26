@@ -284,14 +284,11 @@ TEST(IteratorTest, IterateObjectEmpty) {
 }
 
 TEST(IteratorTest, IterateObject) {
-  Options options;
-  options.sortAttributeNames = false;
-
   std::string const value(
       "{\"a\":1,\"b\":2,\"c\":3,\"d\":4,\"e\":null,\"f\":true,\"g\":\"foo\","
       "\"h\":\"bar\"}");
 
-  Parser parser(&options);
+  Parser parser;
   parser.parse(value);
   Slice s(parser.start());
 
@@ -375,7 +372,6 @@ TEST(IteratorTest, IterateObject) {
 
 TEST(IteratorTest, IterateObjectCompact) {
   Options options;
-  options.sortAttributeNames = false;
   options.buildUnindexedObjects = true;
 
   std::string const value(
@@ -835,7 +831,6 @@ TEST(IteratorTest, ObjectIteratorTranslations) {
   AttributeTranslatorScope scope(translator.get());
 
   Options options;
-  options.sortAttributeNames = false;
   options.attributeTranslator = translator.get();
 
   std::string const value(

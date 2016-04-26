@@ -634,7 +634,7 @@ class Slice {
           return readVariableValueLength<false>(_start + 1);
         }
 
-        VELOCYPACK_ASSERT(h <= 0x12);
+        VELOCYPACK_ASSERT(h <= 0x0e);
         return readInteger<ValueLength>(_start + 1, WidthMap[h]);
       }
 
@@ -760,6 +760,7 @@ class Slice {
 
   ValueLength findDataOffset(uint8_t head) const {
     // Must be called for a nonempty array or object at start():
+    // Currently only used for head <= 0x05
     VELOCYPACK_ASSERT(head <= 0x12);
     unsigned int fsm = FirstSubMap[head];
     if (fsm <= 2 && _start[2] != 0) {
@@ -774,13 +775,14 @@ class Slice {
     return 9;
   }
 
-  // get the offset for the nth member from an Array type
+  // get the offset for the nth member from an Array or Object type
   ValueLength getNthOffset(ValueLength index) const;
 
   // extract the nth member from an Array
   Slice getNth(ValueLength index) const;
 
-  // extract the nth member from an Object
+  // extract the nth member from an Object, note that this is the nth
+  // entry in the hash table for types 0x0b to 0x0e
   Slice getNthKey(ValueLength index, bool) const;
 
   // get the offset for the nth member from a compact Array or Object type
@@ -790,14 +792,6 @@ class Slice {
     VELOCYPACK_ASSERT(head <= 0x0e);
     return static_cast<ValueLength>(WidthMap[head]);
   }
-
-  // perform a linear search for the specified attribute inside an Object
-  Slice searchObjectKeyLinear(std::string const& attribute, ValueLength ieBase,
-                              ValueLength offsetSize, ValueLength n) const;
-
-  // perform a binary search for the specified attribute inside an Object
-  Slice searchObjectKeyBinary(std::string const& attribute, ValueLength ieBase,
-                              ValueLength offsetSize, ValueLength n) const;
 
 // assert that the slice is of a specific type
 // can be used for debugging and removed in production

@@ -133,14 +133,11 @@ TEST(SinkTest, OStreamAppenders) {
 }
 
 TEST(OutStreamTest, StringifyComplexObject) {
-  Options options;
-  options.sortAttributeNames = false;
-
   std::string const value(
       "{\"foo\":\"bar\",\"baz\":[1,2,3,[4]],\"bark\":[{\"troet\\nmann\":1,"
       "\"mötör\":[2,3.4,-42.5,true,false,null,\"some\\nstring\"]}]}");
 
-  Parser parser(&options);
+  Parser parser;
   parser.parse(value);
 
   std::shared_ptr<Builder> builder = parser.steal();
@@ -184,14 +181,11 @@ TEST(PrettyDumperTest, SimpleObject) {
 }
 
 TEST(PrettyDumperTest, ComplexObject) {
-  Options options;
-  options.sortAttributeNames = false;
-
   std::string const value(
       "{\"foo\":\"bar\",\"baz\":[1,2,3,[4]],\"bark\":[{\"troet\\nmann\":1,"
       "\"mötör\":[2,3.4,-42.5,true,false,null,\"some\\nstring\"]}]}");
 
-  Parser parser(&options);
+  Parser parser;
   parser.parse(value);
 
   std::shared_ptr<Builder> builder = parser.steal();
@@ -246,14 +240,11 @@ TEST(StreamDumperTest, UseStringStreamTypedef) {
 }
 
 TEST(StreamDumperTest, ComplexObject) {
-  Options options;
-  options.sortAttributeNames = false;
-
   std::string const value(
       "{\"foo\":\"bar\",\"baz\":[1,2,3,[4]],\"bark\":[{\"troet\\nmann\":1,"
       "\"mötör\":[2,3.4,-42.5,true,false,null,\"some\\nstring\"]}]}");
 
-  Parser parser(&options);
+  Parser parser;
   parser.parse(value);
 
   std::shared_ptr<Builder> builder = parser.steal();
@@ -1255,7 +1246,6 @@ TEST(StringDumperTest, AttributeTranslationsNotSet) {
   AttributeTranslatorScope scope(translator.get());
   
   Options options;
-  options.sortAttributeNames = false;
   options.attributeTranslator = translator.get();
 
   std::string const value("{\"test\":\"bar\"}");
@@ -1284,7 +1274,6 @@ TEST(StringDumperTest, AttributeTranslations) {
   AttributeTranslatorScope scope(translator.get());
 
   Options options;
-  options.sortAttributeNames = false;
   options.attributeTranslator = translator.get();
 
   std::string const value(
@@ -1313,7 +1302,6 @@ TEST(StringDumperTest, AttributeTranslationsInSubObjects) {
   AttributeTranslatorScope scope(translator.get());
 
   Options options;
-  options.sortAttributeNames = false;
   options.attributeTranslator = translator.get();
 
   std::string const value(
