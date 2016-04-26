@@ -426,7 +426,7 @@ class Slice {
 
   // translates an integer key into a string
   Slice translate() const;
-
+ 
   // return the value for an Int object
   int64_t getInt() const;
 
