@@ -166,7 +166,8 @@ class ObjectIterator {
       : _slice(other._slice),
         _size(other._size),
         _position(other._position),
-        _current(other._current) {}
+        _current(other._current) {
+  }
 
   ObjectIterator& operator=(ObjectIterator const& other) {
     _slice = other._slice;
@@ -250,9 +251,8 @@ class ObjectIterator {
     return Slice(_current + key.byteSize());
   }
 
-  inline bool next() throw() {
+  inline void next() throw() {
     operator++();
-    return valid();
   }
 
   inline ValueLength index() const throw() { return _position; }
