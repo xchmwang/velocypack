@@ -122,73 +122,24 @@ TEST(BuilderTest, ArraysSizes) {
   }
 }
 
-TEST(BuilderTest, ObjectsSizesSorted) {
-  ValueLength const kB = 1024;
-  ValueLength const GB = 1024 * 1024 * 1024;
-  ValueLength const nrs[] = {1,                    // bytelen < 256
-                             2,                    // 256 <= bytelen < 64k
-                             (64 * kB) / 130,      // 256 <= bytelen < 64k
-                             (64 * kB) / 130 + 1,  // 64k <= bytelen < 4G
-                             (4 * GB) / 132 - 1,   // 64k <= bytelen < 4G
-                             (4 * GB) / 132};      // 4G <= bytelen
-  ValueLength const byteSizes[] = {
-      1 + 1 + 1 + 1 * 128,                1 + 8 + 2 * 130,
-      1 + 8 + ((64 * kB) / 130) * 130,    1 + 8 + ((64 * kB) / 130 + 1) * 132,
-      1 + 8 + ((4 * GB) / 132 - 1) * 132, 1 + 8 + ((4 * GB) / 132) * 136 + 8};
-  int nr = sizeof(nrs) / sizeof(ValueLength);
-
-  std::string x;
-  for (size_t i = 0; i < 118 - 1; i++) {
-    x.push_back('x');
-  }
-  // Now x has length 118-1 and thus will use 118 bytes as an entry in an object
-  // The attribute name generated below will use another 10.
-
-  for (int i = 0; i < nr; i++) {
-    Options options;
-    options.sortAttributeNames = true;
-
-    Builder b(&options);
-    b.reserve(byteSizes[i]);
-    b.add(Value(ValueType::Object));
-    for (ValueLength j = 0; j < nrs[i]; j++) {
-      std::string attrName = "axxxxxxxx";
-      ValueLength n = j;
-      for (int k = 8; k >= 1; k--) {
-        attrName[k] = (n % 26) + 'A';
-        n /= 26;
-      }
-      b.add(attrName, Value(x));
-    }
-    b.close();
-    uint8_t* start = b.start();
-
-    Slice s(start);
-    checkBuild(s, ValueType::Object, byteSizes[i]);
-    ASSERT_TRUE(0x0b <= *start && *start <= 0x0e);  // Object
-    ASSERT_TRUE(s.isObject());
-    ASSERT_EQ(nrs[i], s.length());
-    ASSERT_TRUE(s["aAAAAAAAA"].isString());
-    ValueLength len;
-    char const* p = s["aAAAAAAAA"].getString(len);
-    ASSERT_EQ(x.size(), len);
-    ASSERT_EQ(x, std::string(p, len));
-  }
+static ValueLength hashTableSize(ValueLength x) {
+  return x + (x * 3) / 20 + 1;
 }
 
-TEST(BuilderTest, ObjectsSizesUnsorted) {
-  ValueLength const kB = 1024;
-  ValueLength const GB = 1024 * 1024 * 1024;
-  ValueLength const nrs[] = {1,                    // bytelen < 256
-                             2,                    // 256 <= bytelen < 64k
-                             (64 * kB) / 130,      // 256 <= bytelen < 64k
-                             (64 * kB) / 130 + 1,  // 64k <= bytelen < 4G
-                             (4 * GB) / 132 - 1,   // 64k <= bytelen < 4G
-                             (4 * GB) / 132};      // 4G <= bytelen
+TEST(BuilderTest, ObjectsSizesHashed) {
+  ValueLength const nrs[] = {1,         // byteSize < 256
+                             2,         // 256 <= byteSize < 64k
+                             502,       // 256 <= byteSize < 64k
+                             503,       // 64k <= byteSize < 4G
+                             32390401,  // 64k <= byteSize < 4G
+                             32390402}; // 4G <= byteSize
   ValueLength const byteSizes[] = {
-      1 + 1 + 1 + 1 * 128,                1 + 8 + 2 * 130,
-      1 + 8 + ((64 * kB) / 130) * 130,    1 + 8 + ((64 * kB) / 130 + 1) * 132,
-      1 + 8 + ((4 * GB) / 132 - 1) * 132, 1 + 8 + ((4 * GB) / 132) * 136 + 8};
+      1 + 2 + 1 * 128 + 1,
+      1 + 8 + 2 * 128 + hashTableSize(2) * 2,
+      1 + 8 + 502 * 128 + hashTableSize(502) * 2,
+      1 + 8 + 503 * 128 + hashTableSize(503) * 4 + 5,
+      1 + 8 + 32390401UL * 128 + hashTableSize(32390401) * 4 + 5,
+      1 + 8 + 32390402UL * 128 + hashTableSize(32390402) * 8 + 17};
   int nr = sizeof(nrs) / sizeof(ValueLength);
 
   std::string x;
@@ -199,13 +150,16 @@ TEST(BuilderTest, ObjectsSizesUnsorted) {
   // The attribute name generated below will use another 10.
 
   for (int i = 0; i < nr; i++) {
-    Options options;
-    options.sortAttributeNames = false;
-
-    Builder b(&options);
+    std::cout << "Test case " << i << " out of " << nr << std::endl;
+    Builder b;
     b.reserve(byteSizes[i]);
     b.add(Value(ValueType::Object));
+    std::cout << "Number of attributes: " << nrs[i] << std::endl;
+    std::cout << "byteSize: " << byteSizes[i] << std::endl;
     for (ValueLength j = 0; j < nrs[i]; j++) {
+      if (j % 1000000 == 0) {
+        std::cout << "Have " << j << " attributes." << std::endl;
+      }
       std::string attrName = "axxxxxxxx";
       ValueLength n = j;
       for (int k = 8; k >= 1; k--) {
@@ -214,15 +168,17 @@ TEST(BuilderTest, ObjectsSizesUnsorted) {
       }
       b.add(attrName, Value(x));
     }
+    std::cout << "Before close..." << std::endl;
     b.close();
+    std::cout << "After close..." << std::endl;
     uint8_t* start = b.start();
 
     Slice s(start);
     checkBuild(s, ValueType::Object, byteSizes[i]);
-    if (nrs[i] == 1) {
-      ASSERT_TRUE(0x0b <= *start && *start <= 0x0e);  // Object sorted
-    } else {
-      ASSERT_TRUE(0x0f <= *start && *start <= 0x12);  // Object unsorted
+    if (i > 0) {
+      ASSERT_TRUE(0x0b <= *start && *start <= 0x0e);  // Object
+    } else {   // compact case for 1 attribute
+      ASSERT_EQ(0x14, *start);
     }
     ASSERT_TRUE(s.isObject());
     ASSERT_EQ(nrs[i], s.length());

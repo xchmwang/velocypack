@@ -1202,7 +1202,7 @@ TEST(BuilderTest, ObjectEmptyCompact) {
   ASSERT_EQ(0, memcmp(result, correctResult, len));
 }
 
-TEST(BuilderTest, ObjectSorted) {
+TEST(BuilderTest, ObjectHashed) {
   double value = 2.3;
   Builder b;
   b.add(Value(ValueType::Object));
