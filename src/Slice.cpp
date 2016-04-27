@@ -783,8 +783,8 @@ Slice Slice::getFromCompactObject(std::string const& attribute) const {
   ObjectIterator it(*this);
   while (it.valid()) {
     Slice key = it.key();
-    if (key.makeKey().isEqualString(attribute)) {
-      return Slice(key.start() + key.byteSize());
+    if (key.isEqualString(attribute)) {
+      return it.value();
     }
 
     it.next();

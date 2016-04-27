@@ -2183,7 +2183,10 @@ TEST(SliceTest, TranslationsSingleMemberObject) {
 
   ASSERT_EQ(1UL, s.length());
   ASSERT_TRUE(s.hasKey("foo"));
-  ASSERT_TRUE(s.get("foo").getBoolean());
+  Slice ss = s.get("foo");
+  ASSERT_FALSE(ss.isNone());
+  ASSERT_TRUE(ss.isBoolean());
+  ASSERT_TRUE(ss.getBoolean());
 
   ASSERT_FALSE(s.hasKey("bar"));
   ASSERT_TRUE(s.get("bar").isNone());
@@ -2269,38 +2272,33 @@ TEST(SliceTest, TranslatedObjectWithoutTranslator) {
 
   ASSERT_EQ(6UL, s.length());
 
+  // Note: Since we use a hash table and not all attributes are translated,
+  // it is hard to predict, when a problem with the attribute translator
+  // is actually detected. The following behaviour is what actually happens:
   Slice ss = s.get("mötör");
   ASSERT_FALSE(ss.isNone());
   ASSERT_TRUE(ss.isSmallInt());
-  ASSERT_EQ(1ULL, ss.getSmallInt());
+  ASSERT_EQ(1L, ss.getSmallInt());
 
-  ss = s.get("quetzal");
-  ASSERT_FALSE(ss.isNone());
-  ASSERT_TRUE(ss.isSmallInt());
-  ASSERT_EQ(2ULL, ss.getSmallInt());
+  ASSERT_VELOCYPACK_EXCEPTION(s.get("quetzal"),
+                              Exception::NeedAttributeTranslator);
 
-  ss = s.get("foo");
-  ASSERT_FALSE(ss.isNone());
-  ASSERT_TRUE(ss.isSmallInt());
-  ASSERT_EQ(3ULL, ss.getSmallInt());
+  ASSERT_VELOCYPACK_EXCEPTION(s.get("foo"),
+                              Exception::NeedAttributeTranslator);
 
-  ss = s.get("bar");
-  ASSERT_FALSE(ss.isNone());
-  ASSERT_TRUE(ss.isSmallInt());
-  ASSERT_EQ(4ULL, ss.getSmallInt());
+  ASSERT_VELOCYPACK_EXCEPTION(s.get("bar"),
+                              Exception::NeedAttributeTranslator);
 
-  ss = s.get("baz");
-  ASSERT_FALSE(ss.isNone());
-  ASSERT_TRUE(ss.isSmallInt());
-  ASSERT_EQ(5ULL, ss.getSmallInt());
+  ASSERT_VELOCYPACK_EXCEPTION(s.get("baz"),
+                              Exception::NeedAttributeTranslator);
 
   ss = s.get("bart");
   ASSERT_FALSE(ss.isNone());
   ASSERT_TRUE(ss.isSmallInt());
-  ASSERT_EQ(6ULL, ss.getSmallInt());
+  ASSERT_EQ(6L, ss.getSmallInt());
 
-  ss = s.get("max");
-  ASSERT_TRUE(ss.isNone());
+  ASSERT_VELOCYPACK_EXCEPTION(s.get("baz"),
+                              Exception::NeedAttributeTranslator);
 }
 
 TEST(SliceTest, TranslatedWithCompactNotation) {
@@ -2334,27 +2332,27 @@ TEST(SliceTest, TranslatedWithCompactNotation) {
   Slice ss = s.get("foo");
   ASSERT_FALSE(ss.isNone());
   ASSERT_TRUE(ss.isSmallInt());
-  ASSERT_EQ(1ULL, ss.getSmallInt());
+  ASSERT_EQ(1L, ss.getSmallInt());
 
   ss = s.get("bar");
   ASSERT_FALSE(ss.isNone());
   ASSERT_TRUE(ss.isSmallInt());
-  ASSERT_EQ(2ULL, ss.getSmallInt());
+  ASSERT_EQ(2L, ss.getSmallInt());
 
   ss = s.get("baz");
   ASSERT_FALSE(ss.isNone());
   ASSERT_TRUE(ss.isSmallInt());
-  ASSERT_EQ(3ULL, ss.getSmallInt());
+  ASSERT_EQ(3L, ss.getSmallInt());
 
   ss = s.get("bark");
   ASSERT_FALSE(ss.isNone());
   ASSERT_TRUE(ss.isSmallInt());
-  ASSERT_EQ(4ULL, ss.getSmallInt());
+  ASSERT_EQ(4L, ss.getSmallInt());
 
   ss = s.get("bart");
   ASSERT_FALSE(ss.isNone());
   ASSERT_TRUE(ss.isSmallInt());
-  ASSERT_EQ(5ULL, ss.getSmallInt());
+  ASSERT_EQ(5L, ss.getSmallInt());
 
   ss = s.get("max");
   ASSERT_TRUE(ss.isNone());
