@@ -52,12 +52,6 @@ class Builder {
   friend class Parser;  // The parser needs access to internals.
 
  public:
-  // A struct for sorting index tables for objects:
-  struct SortEntry {
-    uint8_t const* nameStart;
-    uint64_t nameSize;
-    uint64_t offset;
-  };
 
   void reserve(ValueLength len) { reserveSpace(len); }
 
@@ -108,23 +102,11 @@ class Builder {
     _size = _buffer->size();
   }
 
-  // Sort the indices by attribute name:
-  static void doActualSort(std::vector<SortEntry>& entries);
-
   // Find the actual bytes of the attribute name of the VPack value
   // at position base, also determine the length len of the attribute.
   // This takes into account the different possibilities for the format
   // of attribute names:
   static uint8_t const* findAttrName(uint8_t const* base, uint64_t& len);
-
-  static void sortObjectIndexShort(uint8_t* objBase,
-                                   std::vector<ValueLength>& offsets);
-
-  static void sortObjectIndexLong(uint8_t* objBase,
-                                  std::vector<ValueLength>& offsets);
-
-  static void sortObjectIndex(uint8_t* objBase,
-                              std::vector<ValueLength>& offsets);
 
  public:
   Options const* options;

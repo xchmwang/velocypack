@@ -25,8 +25,8 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 #include <unordered_set>
-//#include <iostream>
 #include <random>
+#include <cmath>
 
 #include "velocypack/velocypack-common.h"
 #include "velocypack/Builder.h"
@@ -53,22 +53,6 @@ std::string Builder::toJson() const {
   return buffer;
 }
 
-void Builder::doActualSort(std::vector<SortEntry>& entries) {
-  VELOCYPACK_ASSERT(entries.size() > 1);
-  std::sort(entries.begin(), entries.end(),
-            [](SortEntry const& a, SortEntry const& b) {
-    // return true iff a < b:
-    uint8_t const* pa = a.nameStart;
-    uint64_t sizea = a.nameSize;
-    uint8_t const* pb = b.nameStart;
-    uint64_t sizeb = b.nameSize;
-    size_t const compareLength = checkOverflow((std::min)(sizea, sizeb));
-    int res = memcmp(pa, pb, compareLength);
-
-    return (res < 0 || (res == 0 && sizea < sizeb));
-  });
-};
-
 uint8_t const* Builder::findAttrName(uint8_t const* base, uint64_t& len) {
   uint8_t const b = *base;
   if (b >= 0x40 && b <= 0xbe) {
@@ -88,69 +72,6 @@ uint8_t const* Builder::findAttrName(uint8_t const* base, uint64_t& len) {
 
   // translate attribute name
   return findAttrName(Slice(base).makeKey().start(), len);
-}
-
-void Builder::sortObjectIndexShort(uint8_t* objBase,
-                                   std::vector<ValueLength>& offsets) {
-  auto cmp = [&](ValueLength a, ValueLength b) -> bool {
-    uint8_t const* aa = objBase + a;
-    uint8_t const* bb = objBase + b;
-    if (*aa >= 0x40 && *aa <= 0xbe && *bb >= 0x40 && *bb <= 0xbe) {
-      // The fast path, short strings:
-      uint8_t m = (std::min)(*aa - 0x40, *bb - 0x40);
-      int c = memcmp(aa + 1, bb + 1, checkOverflow(m));
-      return (c < 0 || (c == 0 && *aa < *bb));
-    } else {
-      uint64_t lena;
-      uint64_t lenb;
-      aa = findAttrName(aa, lena);
-      bb = findAttrName(bb, lenb);
-      uint64_t m = (std::min)(lena, lenb);
-      int c = memcmp(aa, bb, checkOverflow(m));
-      return (c < 0 || (c == 0 && lena < lenb));
-    }
-  };
-  std::sort(offsets.begin(), offsets.end(), cmp);
-}
-
-void Builder::sortObjectIndexLong(uint8_t* objBase,
-                                  std::vector<ValueLength>& offsets) {
-// on some platforms we can use a thread-local vector
-#if __llvm__ == 1
-  // nono thread local
-  std::vector<Builder::SortEntry> entries;
-#elif defined(_WIN32) && defined(_MSC_VER)
-  std::vector<Builder::SortEntry> entries;
-#else
-  // thread local vector for sorting large object attributes
-  thread_local std::vector<Builder::SortEntry> entries;
-  entries.clear();
-#endif
-
-  size_t const n = offsets.size();
-  entries.reserve(n);
-  for (size_t i = 0; i < n; i++) {
-    SortEntry e;
-    e.offset = offsets[i];
-    e.nameStart = findAttrName(objBase + e.offset, e.nameSize);
-    entries.push_back(e);
-  }
-  VELOCYPACK_ASSERT(entries.size() == n);
-  doActualSort(entries);
-
-  // copy back the sorted offsets
-  for (size_t i = 0; i < n; i++) {
-    offsets[i] = entries[i].offset;
-  }
-}
-
-void Builder::sortObjectIndex(uint8_t* objBase,
-                              std::vector<ValueLength>& offsets) {
-  if (offsets.size() > 32) {
-    sortObjectIndexLong(objBase, offsets);
-  } else {
-    sortObjectIndexShort(objBase, offsets);
-  }
 }
 
 void Builder::removeLast() {
@@ -927,6 +848,9 @@ ValueLength Builder::computeCuckooHash(std::vector<ValueLength>& ht,
   ValueLength nrSlots = index.size() + (index.size() * 3) / 20 + 1;
   bool small = nrSlots <= 0x1000000;
 
+  ValueLength searchLimit = nrSlots < 400 ? nrSlots * 3
+      : 1200 + static_cast<ValueLength>(sqrt(nrSlots));
+
   auto insert = [&](uint8_t* objStart, ValueLength offset) {
 
 
@@ -973,7 +897,7 @@ ValueLength Builder::computeCuckooHash(std::vector<ValueLength>& ht,
       ht[pos[i]] = offset;
       offset = tmp;
       checkUniqueness = false;
-    } while (++count <= (std::min)(256UL, 3 * nrSlots));
+    } while (++count <= searchLimit);
     return false;
   };
 
