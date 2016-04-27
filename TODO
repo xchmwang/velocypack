@@ -1,13 +1,13 @@
 Cuckoo-Revolution
 -----------------
 
-* checkAttributeUniqueness (remove switch?)
-* delete sorting attributes
-* repair tests
+* check clever hash
 * check performance
-* empty attribute
-* repair tests testsSlice where vpacks are given
-* comparison of vpack values
+* empty attribute -> write test
+* comparison of vpack values --> check
+* no UTF-8 in compare
+* copy to ArangoDB repo
+
 
 Documentation
 -------------
