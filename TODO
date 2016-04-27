@@ -1,12 +1,10 @@
 Cuckoo-Revolution
 -----------------
 
-* check clever hash
 * check performance
-* empty attribute -> write test
+* copy to ArangoDB repo
 * comparison of vpack values --> check
 * no UTF-8 in compare
-* copy to ArangoDB repo
 
 
 Documentation
