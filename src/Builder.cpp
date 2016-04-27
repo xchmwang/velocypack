@@ -847,51 +847,6 @@ uint8_t* Builder::set(ValuePair const& pair) {
                   "ValueType::Custom are valid for ValuePair argument");
 }
 
-#if 0
-void Builder::checkAttributeUniqueness(Slice const& obj) const {
-  VELOCYPACK_ASSERT(options->checkAttributeUniqueness == true);
-  ValueLength const n = obj.length();
-
-  if (obj.isSorted()) {
-    // object attributes are sorted
-    Slice previous = obj.keyAt(0);
-    ValueLength len;
-    char const* p = previous.getString(len);
-
-    // compare each two adjacent attribute names
-    for (ValueLength i = 1; i < n; ++i) {
-      Slice current = obj.keyAt(i);
-      // keyAt() guarantees a string as returned type
-      VELOCYPACK_ASSERT(current.isString());
-
-      ValueLength len2;
-      char const* q = current.getString(len2);
-
-      if (len == len2 && memcmp(p, q, checkOverflow(len2)) == 0) {
-        // identical key
-        throw Exception(Exception::DuplicateAttributeName);
-      }
-      // re-use already calculated values for next round
-      len = len2;
-      p = q;
-    }
-  } else {
-    std::unordered_set<std::string> keys;
-
-    for (ValueLength i = 0; i < n; ++i) {
-      // note: keyAt() already translates integer attributes
-      Slice key = obj.keyAt(i);
-      // keyAt() guarantees a string as returned type
-      VELOCYPACK_ASSERT(key.isString());
-
-      if (!keys.emplace(key.copyString()).second) {
-        throw Exception(Exception::DuplicateAttributeName);
-      }
-    }
-  }
-}
-#endif
-
 uint8_t* Builder::add(std::string const& attrName, Value const& sub) {
   return addInternal<Value>(attrName, sub);
 }
@@ -973,27 +928,52 @@ ValueLength Builder::computeCuckooHash(std::vector<ValueLength>& ht,
   bool small = nrSlots <= 0x1000000;
 
   auto insert = [&](uint8_t* objStart, ValueLength offset) {
-    ValueLength count2 = 0;
+
+
+    bool checkUniqueness = options->checkAttributeUniqueness;
+
+    ValueLength count = 0;
     do {
       // Compute all three hash values:
       ValueLength pos[3];
       ValueLength attrLen;
       uint8_t const* attrName = findAttrName(objStart + offset, attrLen);
+
+      auto doTheCheck = [&] (ValueLength otherOffset) -> void {
+        ValueLength otherLen;
+        uint8_t const* otherName = findAttrName(objStart + otherOffset,
+                                                otherLen);
+        if (attrLen == otherLen && memcmp(attrName, otherName, otherLen) == 0) {
+          throw Exception(Exception::DuplicateAttributeName);
+        }
+      };
+
       fasthash64x3(attrName, attrLen, Slice::seedTable + 3 * seed, pos);
-      
+
+      // On the topic of uniqueness: This program never deletes entries
+      // from the hash table (except throwing the table away completely).
+      // Furthermore, it puts a new entry in the first free of its three
+      // possible positions. It might be moved later, but only because
+      // something else is put in its place. Therefore, should an 
+      // attribute name occur more than once, the second one will 
+      // never see an empty slot before it sees the first one. qed.
       pos[0] = small ? fastModulo32Bit(pos[0], nrSlots) : pos[0] % nrSlots;
-      if (ht[pos[0]] == 0) { ht[pos[0]] = offset; return true; }
+      if (ht[pos[0]] == 0) { ht[pos[0]] = offset; return true; } 
+      else if (checkUniqueness) { doTheCheck(ht[pos[0]]); }
       pos[1] = small ? fastModulo32Bit(pos[1], nrSlots) : pos[1] % nrSlots;
       if (ht[pos[1]] == 0) { ht[pos[1]] = offset; return true; }
+      else if (checkUniqueness) { doTheCheck(ht[pos[1]]); }
       pos[2] = small ? fastModulo32Bit(pos[2], nrSlots) : pos[2] % nrSlots;
       if (ht[pos[2]] == 0) { ht[pos[2]] = offset; return true; }
+      else if (checkUniqueness) { doTheCheck(ht[pos[2]]); }
 
       // Play cuckoo:
       uint8_t i = d(e);
       ValueLength tmp = ht[pos[i]];
       ht[pos[i]] = offset;
       offset = tmp;
-    } while (++count2 <= (std::min)(256UL, 3 * nrSlots));
+      checkUniqueness = false;
+    } while (++count <= (std::min)(256UL, 3 * nrSlots));
     return false;
   };
 
@@ -1001,97 +981,7 @@ ValueLength Builder::computeCuckooHash(std::vector<ValueLength>& ht,
     seed = 0;
     do {
       // Will be left by return as soon as successful
-      
-      // Initialize empty hash table of given size:
-      ht.clear();
-      ht.reserve(nrSlots);
-      ht.insert(ht.begin(), nrSlots, 0);
-      bool error = false;
-      for (size_t i = 0; i < index.size(); i++) {
-        if (!insert(_start + tos, index[i])) {
-          error = true;
-          break;
-        }
-      }
-      if (!error) {
-        return nrSlots;
-      }
-      seed++;
-    } while (seed != 0);
-    nrSlots = nrSlots * 110 / 100;
-    small = nrSlots <= 0x1000000;
-  }
-  // never reached
-}
 
-ValueLength Builder::computeCuckooHash2(std::vector<ValueLength>& ht,
-                                       uint8_t& seed) {
-  std::mt19937_64 e(123456789);
-  std::uniform_int_distribution<uint8_t> d(0,2);
-
-  ValueLength tos = _stack.back();
-  std::vector<ValueLength> const& index = _index[_stack.size() - 1];
-  // The following is heuristics: We add one slot for sizes 2 to 6,
-  // then 2 for sizes 7 to 13 and so on:
-  ValueLength nrSlots = index.size() + (index.size() * 3) / 20 + 1;
-  bool small = nrSlots <= 0x1000000;
-
-  std::vector<ValueLength> orbit;
-  std::vector<ValueLength> back;
-  std::vector<bool> inorbit;
-
-  auto insert = [&](uint8_t* objStart, ValueLength offset) {
-    orbit.clear();
-    orbit.push_back(UINT64_MAX);
-    back.clear();
-    back.push_back(UINT64_MAX);
-    inorbit.clear();
-    inorbit.insert(inorbit.begin(), nrSlots, false);
-    ValueLength i = 0;
-    bool found = false;
-    do {
-      if (i >= orbit.size() || orbit.size() > (std::min)(256UL, nrSlots / 2)) {
-        return false;
-      }
-      // Compute all three hash values:
-      ValueLength off = (i == 0) ? offset : ht[orbit[i]];
-      ValueLength pos[3];
-      ValueLength attrLen;
-      uint8_t const* attrName = findAttrName(objStart + off, attrLen);
-      fasthash64x3(attrName, attrLen, Slice::seedTable + 3 * seed, pos);
-      
-      for (uint8_t j = 0; j <= 2; ++j) {
-        ValueLength newPos 
-            = small ? fastModulo32Bit(pos[j], nrSlots) : pos[j] % nrSlots;
-        if (!inorbit[newPos]) {
-          orbit.push_back(newPos);
-          inorbit[newPos] = true;
-          back.push_back(i);
-          if (ht[newPos] == 0) {
-            found = true;
-            break;
-          }
-        }
-      }
-      ++i;
-    } while (!found);
-    // Play cuckoo:
-    i = orbit.size() - 1;
-    ValueLength j = back[i];
-    while (j > 0) {
-      ht[orbit[i]] = ht[orbit[j]];
-      i = j;
-      j = back[i];
-    }
-    ht[orbit[i]] = offset;
-    return true;
-  };
-
-  while (true) {   // outer loop to try table sizes
-    seed = 0;
-    do {
-      // Will be left by return as soon as successful
-      
       // Initialize empty hash table of given size:
       ht.clear();
       ht.reserve(nrSlots);

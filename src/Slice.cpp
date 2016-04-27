@@ -611,7 +611,7 @@ Slice Slice::get(std::string const& attribute) const {
     seed = _start[1 + 3 * offsetSize];
   } else {
     nrSlots = readInteger<ValueLength>(_start+end-1-offsetSize, offsetSize);
-    htBase = end - nrSlots * offsetSize - 1 - (offsetSize == 4 ? 8 : 16);
+    htBase = end - nrSlots * offsetSize - 1 - (offsetSize == 4 ? 4 : 16);
     seed = _start[end-1];
   }
   bool small = nrSlots <= 0x1000000;

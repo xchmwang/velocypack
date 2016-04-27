@@ -24,7 +24,6 @@
 /// @author Copyright 2015, ArangoDB GmbH, Cologne, Germany
 ////////////////////////////////////////////////////////////////////////////////
 
-#include <ostream>
 #include <string>
 
 #include "tests-common.h"
@@ -2018,7 +2017,6 @@ TEST(ParserTest, LongObjectFewMembers) {
       }
     }
     key.append(std::to_string(i));
-    std::cout << "Key:" << key << std::endl;
 
     ASSERT_TRUE(s.hasKey(key));
     Slice sv = s.get(key);
