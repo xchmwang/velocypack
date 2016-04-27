@@ -1944,8 +1944,8 @@ TEST(SliceTest, NormalizedHashObject) {
   ASSERT_EQ(11628931957207254128ULL, s1.hash());
   ASSERT_EQ(4048487509578424242ULL, s2.hash());
 
-  ASSERT_EQ(761244080014510746ULL, s1.normalizedHash());
-  ASSERT_EQ(761244080014510746ULL, s2.normalizedHash());
+  ASSERT_EQ(18068466095586825298ULL, s1.normalizedHash());
+  ASSERT_EQ(18068466095586825298ULL, s2.normalizedHash());
 }
 
 TEST(SliceTest, NormalizedHashObjectOrder) {
@@ -1966,8 +1966,8 @@ TEST(SliceTest, NormalizedHashObjectOrder) {
   ASSERT_EQ(11628931957207254128ULL, s1.hash());
   ASSERT_EQ(908324992578001940ULL, s2.hash());
 
-  ASSERT_EQ(761244080014510746ULL, s1.normalizedHash());
-  ASSERT_EQ(761244080014510746ULL, s2.normalizedHash());
+  ASSERT_EQ(18068466095586825298ULL, s1.normalizedHash());
+  ASSERT_EQ(18068466095586825298ULL, s2.normalizedHash());
 }
 
 TEST(SliceTest, GetNumericValueIntNoLoss) {

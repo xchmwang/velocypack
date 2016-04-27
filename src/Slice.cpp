@@ -553,7 +553,6 @@ std::string Slice::toString(Options const* options) const {
 std::string Slice::hexType() const { return HexDump::toHex(head()); }
   
 uint64_t Slice::normalizedHash(uint64_t seed) const {
-  // FIXME: CUCKOO
   uint64_t value;
 
   if (isNumber()) {
@@ -575,8 +574,9 @@ uint64_t Slice::normalizedHash(uint64_t seed) const {
     uint64_t seed2 = fasthash64(&n, sizeof(n), seed);
     value = seed2;
     for (auto const& it : ObjectIterator(*this)) {
-      value ^= it.key.normalizedHash(seed2);
-      value ^= it.value.normalizedHash(seed2);
+      uint64_t seed3 = it.key.normalizedHash(seed2);
+      value ^= seed3;
+      value ^= it.value.normalizedHash(seed3);
     }
   } else {
     // fall back to regular hash function
