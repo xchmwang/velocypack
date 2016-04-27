@@ -2641,6 +2641,56 @@ TEST(BuilderTest, HandInBuffer) {
   }
 }
 
+TEST(BuilderTest, EmptyAttributeNames) {
+  Builder b;
+  {
+    ObjectBuilder guard(&b);
+    b.add("", Value(123));
+    b.add("a", Value("abc"));
+  }
+  Slice s = b.slice();
+
+  ASSERT_EQ(2UL, s.length());
+
+  Slice ss = s.get("");
+  ASSERT_FALSE(ss.isNone());
+  ASSERT_TRUE(ss.isInteger());
+  ASSERT_EQ(123L, ss.getInt());
+
+  ss = s.get("a");
+  ASSERT_FALSE(ss.isNone());
+  ASSERT_TRUE(ss.isString());
+  ASSERT_EQ(std::string("abc"), ss.copyString());
+
+  ss = s.get("b");
+  ASSERT_TRUE(ss.isNone());
+}
+
+TEST(BuilderTest, EmptyAttributeNamesNotThere) {
+  Builder b;
+  {
+    ObjectBuilder guard(&b);
+    b.add("b", Value(123));
+    b.add("a", Value("abc"));
+  }
+  Slice s = b.slice();
+
+  ASSERT_EQ(2UL, s.length());
+
+  Slice ss = s.get("b");
+  ASSERT_FALSE(ss.isNone());
+  ASSERT_TRUE(ss.isInteger());
+  ASSERT_EQ(123L, ss.getInt());
+
+  ss = s.get("a");
+  ASSERT_FALSE(ss.isNone());
+  ASSERT_TRUE(ss.isString());
+  ASSERT_EQ(std::string("abc"), ss.copyString());
+
+  ss = s.get("");
+  ASSERT_TRUE(ss.isNone());
+}
+
 int main(int argc, char* argv[]) {
   ::testing::InitGoogleTest(&argc, argv);
 

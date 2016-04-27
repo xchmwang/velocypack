@@ -24,7 +24,6 @@
 /// @author Copyright 2015, ArangoDB GmbH, Cologne, Germany
 ////////////////////////////////////////////////////////////////////////////////
 
-#include <ostream>
 #include <string>
 
 #include "tests-common.h"
@@ -150,16 +149,10 @@ TEST(BuilderTest, ObjectsSizesHashed) {
   // The attribute name generated below will use another 10.
 
   for (int i = 0; i < nr; i++) {
-    std::cout << "Test case " << i << " out of " << nr << std::endl;
     Builder b;
     b.reserve(byteSizes[i]);
     b.add(Value(ValueType::Object));
-    std::cout << "Number of attributes: " << nrs[i] << std::endl;
-    std::cout << "byteSize: " << byteSizes[i] << std::endl;
     for (ValueLength j = 0; j < nrs[i]; j++) {
-      if (j % 1000000 == 0) {
-        std::cout << "Have " << j << " attributes." << std::endl;
-      }
       std::string attrName = "axxxxxxxx";
       ValueLength n = j;
       for (int k = 8; k >= 1; k--) {
@@ -168,9 +161,7 @@ TEST(BuilderTest, ObjectsSizesHashed) {
       }
       b.add(attrName, Value(x));
     }
-    std::cout << "Before close..." << std::endl;
     b.close();
-    std::cout << "After close..." << std::endl;
     uint8_t* start = b.start();
 
     Slice s(start);
