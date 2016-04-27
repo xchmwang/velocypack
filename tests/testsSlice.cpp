@@ -1571,10 +1571,13 @@ TEST(SliceTest, ObjectCompact) {
   ASSERT_TRUE(ss.isSmallInt());
   ASSERT_EQ(1LL, ss.getInt());
   ss = s["c"];
-  ASSERT_TRUE(ss.isNone());
+  ASSERT_TRUE(ss.isSmallInt());
+  ASSERT_EQ(2LL, ss.getInt());
   ss = s["d"];
   ASSERT_TRUE(ss.isSmallInt());
   ASSERT_EQ(3LL, ss.getInt());
+  ss = s["e"];
+  ASSERT_TRUE(ss.isNone());
 }
 
 TEST(SliceTest, ToStringNull) {
@@ -1846,7 +1849,7 @@ TEST(SliceTest, HashObject) {
       "\"seven\":7}");
   Slice s = b->slice();
 
-  ASSERT_EQ(6865527808070733846ULL, s.hash());
+  ASSERT_EQ(11628931957207254128ULL, s.hash());
 }
 
 TEST(SliceTest, NormalizedHashDouble) {
@@ -1938,7 +1941,7 @@ TEST(SliceTest, NormalizedHashObject) {
   Slice s2 = b2->slice();
   
   // hash values differ, but normalized hash values shouldn't!
-  ASSERT_EQ(15518419071972093120ULL, s1.hash());
+  ASSERT_EQ(11628931957207254128ULL, s1.hash());
   ASSERT_EQ(4048487509578424242ULL, s2.hash());
 
   ASSERT_EQ(761244080014510746ULL, s1.normalizedHash());
@@ -1960,8 +1963,8 @@ TEST(SliceTest, NormalizedHashObjectOrder) {
   Slice s2 = b2->slice();
   
   // hash values differ, but normalized hash values shouldn't!
-  ASSERT_EQ(6865527808070733846ULL, s1.hash());
-  ASSERT_EQ(11084437118009261125ULL, s2.hash());
+  ASSERT_EQ(11628931957207254128ULL, s1.hash());
+  ASSERT_EQ(908324992578001940ULL, s2.hash());
 
   ASSERT_EQ(761244080014510746ULL, s1.normalizedHash());
   ASSERT_EQ(761244080014510746ULL, s2.normalizedHash());
@@ -2158,15 +2161,6 @@ TEST(SliceTest, Translations) {
   ASSERT_EQ(20UL, s.get("mötörhead").getUInt());
   ASSERT_TRUE(s.hasKey("quetzal"));
   ASSERT_EQ(21UL, s.get("quetzal").getUInt());
-
-  ASSERT_EQ("foo", s.keyAt(0).copyString());
-  ASSERT_EQ("bar", s.keyAt(1).copyString());
-  ASSERT_EQ("baz", s.keyAt(2).copyString());
-  ASSERT_EQ("bart", s.keyAt(3).copyString());
-  ASSERT_EQ("bark", s.keyAt(4).copyString());
-  ASSERT_EQ("mötör", s.keyAt(5).copyString());
-  ASSERT_EQ("mötörhead", s.keyAt(6).copyString());
-  ASSERT_EQ("quetzal", s.keyAt(7).copyString());
 }
 
 TEST(SliceTest, TranslationsSingleMemberObject) {
