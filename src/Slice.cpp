@@ -205,6 +205,10 @@ unsigned int const Slice::FirstSubMap[32] = {
     9,  // 0x0e, object with sorted index table
     0};
 
+// The first 9 of these are the so called Hackstone numbers.
+// They are particularly carefully chosen to avoid collisions
+// with ArangoDB's standard attributes and numbers of attributes < 100.
+
 ValueLength const Slice::seedTable[3 * 256] = { 
   0x8600ce7d25e7fc20ULL, 0x79c50070022d3585ULL, 0xcafa4ab1c095cc7fULL,
   0x2e78797614fb3112ULL, 0xd221c18d03d081c9ULL, 0x782ef2a743bf9e70ULL,
@@ -613,6 +617,9 @@ Slice Slice::get(std::string const& attribute) const {
     nrSlots = readInteger<ValueLength>(_start+end-1-offsetSize, offsetSize);
     htBase = end - nrSlots * offsetSize - 1 - (offsetSize == 4 ? 4 : 16);
     seed = _start[end-1];
+  }
+  if (nrSlots == 0) {
+    throw Exception(Exception::NumberOutOfRange);
   }
   bool small = nrSlots <= 0x1000000;
   Slice s;

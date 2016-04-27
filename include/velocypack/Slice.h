@@ -305,9 +305,12 @@ class Slice {
       return (end - firstSubOffset) / first.byteSize();
     } else if (offsetSize < 8) {
       return readInteger<ValueLength>(_start + offsetSize + 1, offsetSize);
+    } else if (h == 0x09) {
+      return readInteger<ValueLength>(_start + end - offsetSize, offsetSize);
+    } else {   // h == 0x0e
+      return readInteger<ValueLength>(_start + end - 2 * offsetSize - 1,
+                                      offsetSize);
     }
-
-    return readInteger<ValueLength>(_start + end - offsetSize, offsetSize);
   }
 
   // extract a key from an Object at the specified index
