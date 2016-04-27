@@ -313,36 +313,6 @@ class Slice {
     }
   }
 
-  // extract a key from an Object at the specified index
-  // - 0x0a      : empty object
-  // - 0x0b      : object with 1-byte index table entries, sorted by attribute
-  // name
-  // - 0x0c      : object with 2-byte index table entries, sorted by attribute
-  // name
-  // - 0x0d      : object with 4-byte index table entries, sorted by attribute
-  // name
-  // - 0x0e      : object with 8-byte index table entries, sorted by attribute
-  // name
-  Slice keyAt(ValueLength index, bool translate = true) const {
-    if (!isObject()) {
-      throw Exception(Exception::InvalidValueType, "Expecting type Object");
-    }
-
-    return getNthKey(index, translate);
-  }
-
-  Slice valueAt(ValueLength index) const {
-    if (!isObject()) {
-      throw Exception(Exception::InvalidValueType, "Expecting type Object");
-    }
-
-    Slice key = getNthKey(index, false);
-    if (key.isNone()) {
-      return key;
-    }
-    return Slice(key.start() + key.byteSize());
-  }
-
   // look for the specified attribute path inside an Object
   // returns a Slice(ValueType::None) if not found
   Slice get(std::vector<std::string> const& attributes) const {
@@ -801,10 +771,6 @@ class Slice {
 
   // extract the nth member from an Array
   Slice getNth(ValueLength index) const;
-
-  // extract the nth member from an Object, note that this is the nth
-  // entry in the hash table for types 0x0b to 0x0e
-  Slice getNthKey(ValueLength index, bool) const;
 
   // get the offset for the nth member from a compact Array or Object type
   ValueLength getNthOffsetFromCompact(ValueLength index) const;

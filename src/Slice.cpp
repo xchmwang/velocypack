@@ -868,24 +868,6 @@ Slice Slice::getNth(ValueLength index) const {
   return Slice(_start + getNthOffset(index));
 }
 
-// extract the nth member from an Object
-Slice Slice::getNthKey(ValueLength index, bool translate) const {
-  VELOCYPACK_ASSERT(type() == ValueType::Object);
-
-  ValueLength offset = getNthOffset(index);
-  if (offset == 0) {
-    return noneSlice();
-  }
-
-  Slice s(_start + offset);
-
-  if (translate) {
-    return s.makeKey();
-  }
-
-  return s;
-}
-
 Slice Slice::makeKey() const {
   if (isString()) {
     return *this;

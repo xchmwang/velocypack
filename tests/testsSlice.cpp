@@ -2238,14 +2238,6 @@ TEST(SliceTest, TranslationsSubObjects) {
   ASSERT_TRUE(s.get("bark").isObject());
   ASSERT_EQ(5UL, s.get(std::vector<std::string>({"bark", "foo"})).getUInt());
   ASSERT_EQ(6UL, s.get(std::vector<std::string>({"bark", "bar"})).getUInt());
-  ASSERT_EQ("foo", s.keyAt(0).copyString());
-  ASSERT_EQ("bar", s.valueAt(0).keyAt(0).copyString());
-  ASSERT_EQ("baz", s.valueAt(0).keyAt(1).copyString());
-  ASSERT_EQ("bark", s.valueAt(0).keyAt(2).copyString());
-  ASSERT_EQ("bar", s.keyAt(1).copyString());
-  ASSERT_EQ("bark", s.keyAt(2).copyString());
-  ASSERT_EQ("foo", s.valueAt(2).keyAt(0).copyString());
-  ASSERT_EQ("bar", s.valueAt(2).keyAt(1).copyString());
 }
 
 TEST(SliceTest, TranslatedObjectWithoutTranslator) {
@@ -2276,15 +2268,39 @@ TEST(SliceTest, TranslatedObjectWithoutTranslator) {
   scope.revert();
 
   ASSERT_EQ(6UL, s.length());
-  ASSERT_EQ("mötör", s.keyAt(0).copyString());
-  ASSERT_EQ("quetzal", s.keyAt(1).copyString());
-  ASSERT_VELOCYPACK_EXCEPTION(s.keyAt(2).copyString(),
-                              Exception::NeedAttributeTranslator);
-  ASSERT_VELOCYPACK_EXCEPTION(s.keyAt(3).copyString(),
-                              Exception::NeedAttributeTranslator);
-  ASSERT_VELOCYPACK_EXCEPTION(s.keyAt(4).copyString(),
-                              Exception::NeedAttributeTranslator);
-  ASSERT_EQ("bart", s.keyAt(5).copyString());
+
+  Slice ss = s.get("mötör");
+  ASSERT_FALSE(ss.isNone());
+  ASSERT_TRUE(ss.isSmallInt());
+  ASSERT_EQ(1ULL, ss.getSmallInt());
+
+  ss = s.get("quetzal");
+  ASSERT_FALSE(ss.isNone());
+  ASSERT_TRUE(ss.isSmallInt());
+  ASSERT_EQ(2ULL, ss.getSmallInt());
+
+  ss = s.get("foo");
+  ASSERT_FALSE(ss.isNone());
+  ASSERT_TRUE(ss.isSmallInt());
+  ASSERT_EQ(3ULL, ss.getSmallInt());
+
+  ss = s.get("bar");
+  ASSERT_FALSE(ss.isNone());
+  ASSERT_TRUE(ss.isSmallInt());
+  ASSERT_EQ(4ULL, ss.getSmallInt());
+
+  ss = s.get("baz");
+  ASSERT_FALSE(ss.isNone());
+  ASSERT_TRUE(ss.isSmallInt());
+  ASSERT_EQ(5ULL, ss.getSmallInt());
+
+  ss = s.get("bart");
+  ASSERT_FALSE(ss.isNone());
+  ASSERT_TRUE(ss.isSmallInt());
+  ASSERT_EQ(6ULL, ss.getSmallInt());
+
+  ss = s.get("max");
+  ASSERT_TRUE(ss.isNone());
 }
 
 TEST(SliceTest, TranslatedWithCompactNotation) {
@@ -2315,12 +2331,33 @@ TEST(SliceTest, TranslatedWithCompactNotation) {
   Slice s = Slice(b.start());
   ASSERT_EQ(0x14, s.head());
 
-  ASSERT_EQ(5UL, s.length());
-  ASSERT_EQ("foo", s.keyAt(0).copyString());
-  ASSERT_EQ("bar", s.keyAt(1).copyString());
-  ASSERT_EQ("baz", s.keyAt(2).copyString());
-  ASSERT_EQ("bark", s.keyAt(3).copyString());
-  ASSERT_EQ("bart", s.keyAt(4).copyString());
+  Slice ss = s.get("foo");
+  ASSERT_FALSE(ss.isNone());
+  ASSERT_TRUE(ss.isSmallInt());
+  ASSERT_EQ(1ULL, ss.getSmallInt());
+
+  ss = s.get("bar");
+  ASSERT_FALSE(ss.isNone());
+  ASSERT_TRUE(ss.isSmallInt());
+  ASSERT_EQ(2ULL, ss.getSmallInt());
+
+  ss = s.get("baz");
+  ASSERT_FALSE(ss.isNone());
+  ASSERT_TRUE(ss.isSmallInt());
+  ASSERT_EQ(3ULL, ss.getSmallInt());
+
+  ss = s.get("bark");
+  ASSERT_FALSE(ss.isNone());
+  ASSERT_TRUE(ss.isSmallInt());
+  ASSERT_EQ(4ULL, ss.getSmallInt());
+
+  ss = s.get("bart");
+  ASSERT_FALSE(ss.isNone());
+  ASSERT_TRUE(ss.isSmallInt());
+  ASSERT_EQ(5ULL, ss.getSmallInt());
+
+  ss = s.get("max");
+  ASSERT_TRUE(ss.isNone());
 }
 
 TEST(SliceTest, TranslatedInvalidKey) {
@@ -2340,7 +2377,6 @@ TEST(SliceTest, TranslatedInvalidKey) {
   Slice s = Slice(data);
 
   ASSERT_EQ(1UL, s.length());
-  ASSERT_VELOCYPACK_EXCEPTION(s.keyAt(0).copyString(), Exception::InvalidValueType);
   ASSERT_VELOCYPACK_EXCEPTION(Collection::keys(s), Exception::InvalidValueType);
 }
 

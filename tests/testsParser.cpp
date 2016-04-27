@@ -1710,14 +1710,13 @@ TEST(ParserTest, ObjectSimple1) {
   checkBuild(s, ValueType::Object, 8);
   ASSERT_EQ(1ULL, s.length());
 
-  Slice ss = s.keyAt(0);
-  checkBuild(ss, ValueType::String, 4);
-
-  std::string correct = "foo";
-  ASSERT_EQ(correct, ss.copyString());
-  ss = s.valueAt(0);
+  Slice ss = s.get("foo");
+  ASSERT_FALSE(ss.isNone());
   checkBuild(ss, ValueType::SmallInt, 1);
   ASSERT_EQ(1, ss.getSmallInt());
+
+  ss = s.get("bar");
+  ASSERT_TRUE(ss.isNone());
 
   std::string valueOut = "{\"foo\":1}";
   checkDump(s, valueOut);
@@ -1735,23 +1734,17 @@ TEST(ParserTest, ObjectSimple2) {
   checkBuild(s, ValueType::Object, 21);
   ASSERT_EQ(2ULL, s.length());
 
-  Slice ss = s.keyAt(0);
+  Slice ss = s.get("foo");
+  ASSERT_FALSE(ss.isNone());
   checkBuild(ss, ValueType::String, 4);
-  std::string correct = "foo";
-  ASSERT_EQ(correct, ss.copyString());
-  ss = s.valueAt(0);
-  checkBuild(ss, ValueType::String, 4);
-  correct = "bar";
+  std::string correct = "bar";
   ASSERT_EQ(correct, ss.copyString());
 
-  ss = s.keyAt(1);
+  ss = s.get("bar");
   ASSERT_TRUE(ss.isNone());
 
-  ss = s.keyAt(2);
-  checkBuild(ss, ValueType::String, 4);
-  correct = "baz";
-  ASSERT_EQ(correct, ss.copyString());
-  ss = s.valueAt(2);
+  ss = s.get("baz");
+  ASSERT_FALSE(ss.isNone());
   checkBuild(ss, ValueType::Bool, 1);
   ASSERT_TRUE(ss.getBool());
 
@@ -1771,23 +1764,17 @@ TEST(ParserTest, ObjectDenseNotation) {
   checkBuild(s, ValueType::Object, 16);
   ASSERT_EQ(2ULL, s.length());
 
-  Slice ss = s.keyAt(0);
+  Slice ss = s.get("c");
+  ASSERT_FALSE(ss.isNone());
   checkBuild(ss, ValueType::String, 2);
-  std::string correct = "c";
-  ASSERT_EQ(correct, ss.copyString());
-  ss = s.valueAt(0);
-  checkBuild(ss, ValueType::String, 2);
-  correct = "d";
+  std::string correct = "d";
   ASSERT_EQ(correct, ss.copyString());
 
-  ss = s.keyAt(1);
+  ss = s.get("e");
   ASSERT_TRUE(ss.isNone());
 
-  ss = s.keyAt(2);
-  checkBuild(ss, ValueType::String, 2);
-  correct = "a";
-  ASSERT_EQ(correct, ss.copyString());
-  ss = s.valueAt(2);
+  ss = s.get("a");
+  ASSERT_FALSE(ss.isNone());
   checkBuild(ss, ValueType::String, 2);
   correct = "b";
   ASSERT_EQ(correct, ss.copyString());
@@ -1808,34 +1795,25 @@ TEST(ParserTest, ObjectReservedKeys) {
   checkBuild(s, ValueType::Object, 38);
   ASSERT_EQ(3ULL, s.length());
 
-  Slice ss = s.keyAt(0);
-  checkBuild(ss, ValueType::String, 6);
-  std::string correct = "false";
-  ASSERT_EQ(correct, ss.copyString());
-  ss = s.valueAt(0);
+  Slice ss = s.get("false");
+  ASSERT_FALSE(ss.isNone());
   checkBuild(ss, ValueType::String, 4);
-  correct = "bar";
+  std::string correct = "bar";
   ASSERT_EQ(correct, ss.copyString());
 
-  ss = s.keyAt(1);
-  checkBuild(ss, ValueType::String, 5);
-  correct = "true";
-  ASSERT_EQ(correct, ss.copyString());
-  ss = s.valueAt(1);
+  ss = s.get("true");
+  ASSERT_FALSE(ss.isNone());
   checkBuild(ss, ValueType::String, 4);
   correct = "foo";
   ASSERT_EQ(correct, ss.copyString());
 
-  ss = s.keyAt(2);
-  checkBuild(ss, ValueType::String, 5);
-  correct = "null";
-  ASSERT_EQ(correct, ss.copyString());
-  ss = s.valueAt(2);
+  ss = s.get("null");
+  ASSERT_FALSE(ss.isNone());
   checkBuild(ss, ValueType::String, 5);
   correct = "true";
   ASSERT_EQ(correct, ss.copyString());
 
-  ss = s.keyAt(3);
+  ss = s.get("none");
   ASSERT_TRUE(ss.isNone());
 
   std::string const valueOut =
@@ -1856,45 +1834,31 @@ TEST(ParserTest, ObjectMixed) {
   checkBuild(s, ValueType::Object, 46);
   ASSERT_EQ(5ULL, s.length());
 
-  Slice ss = s.keyAt(0);
-  checkBuild(ss, ValueType::String, 4);
-  std::string correct = "foo";
-  ASSERT_EQ(correct, ss.copyString());
-  ss = s.valueAt(0);
+  Slice ss = s.get("foo");
+  ASSERT_FALSE(ss.isNone());
   checkBuild(ss, ValueType::Null, 1);
+  ASSERT_TRUE(ss.isNull());
 
-  ss = s.keyAt(1);
-  checkBuild(ss, ValueType::String, 4);
-  correct = "quz";
-  ASSERT_EQ(correct, ss.copyString());
-  ss = s.valueAt(1);
+  ss = s.get("quz");
+  ASSERT_FALSE(ss.isNone());
   checkBuild(ss, ValueType::Object, 1);
   ASSERT_EQ(0ULL, ss.length());
 
-  ss = s.keyAt(2);
-  checkBuild(ss, ValueType::String, 4);
-  correct = "bar";
-  ASSERT_EQ(correct, ss.copyString());
-  ss = s.valueAt(2);
+  ss = s.get("bar");
+  ASSERT_FALSE(ss.isNone());
   checkBuild(ss, ValueType::Bool, 1);
   ASSERT_TRUE(ss.getBool());
 
-  ss = s.keyAt(3);
+  ss = s.get("fuxx");
   ASSERT_TRUE(ss.isNone());
 
-  ss = s.keyAt(4);
-  checkBuild(ss, ValueType::String, 4);
-  correct = "baz";
-  ASSERT_EQ(correct, ss.copyString());
-  ss = s.valueAt(4);
+  ss = s.get("baz");
+  ASSERT_FALSE(ss.isNone());
   checkBuild(ss, ValueType::Double, 9);
   ASSERT_EQ(13.53, ss.getDouble());
 
-  ss = s.keyAt(5);
-  checkBuild(ss, ValueType::String, 4);
-  correct = "qux";
-  ASSERT_EQ(correct, ss.copyString());
-  ss = s.valueAt(5);
+  ss = s.get("qux");
+  ASSERT_FALSE(ss.isNone());
   checkBuild(ss, ValueType::Array, 3);
 
   Slice sss = ss[0];
@@ -2089,11 +2053,8 @@ TEST(ParserTest, Utf8Bom) {
   checkBuild(s, ValueType::Object, 8);
   ASSERT_EQ(1ULL, s.length());
 
-  Slice ss = s.keyAt(0);
-  checkBuild(ss, ValueType::String, 4);
-  std::string correct = "foo";
-  ASSERT_EQ(correct, ss.copyString());
-  ss = s.valueAt(0);
+  Slice ss = s.get("foo");
+  ASSERT_FALSE(ss.isNone());
   checkBuild(ss, ValueType::SmallInt, 1);
   ASSERT_EQ(1ULL, ss.getUInt());
 
