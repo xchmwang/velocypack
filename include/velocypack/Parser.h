@@ -44,6 +44,7 @@ class Parser {
   // This class can parse JSON very rapidly, but only from contiguous
   // blocks of memory. It builds the result using the Builder.
 
+ protected:
   struct ParsedNumber {
     ParsedNumber() : intValue(0), doubleValue(0.0), isInteger(true) {}
 
@@ -92,7 +93,7 @@ class Parser {
   Parser(Parser&&) = delete;
   Parser& operator=(Parser const&) = delete;
   Parser& operator=(Parser&&) = delete;
-  ~Parser() = default;
+  virtual ~Parser() = default;
 
   explicit Parser(Options const* options = &Options::Defaults)
       : _start(nullptr), _size(0), _pos(0), _nesting(0), options(options) {
@@ -112,7 +113,7 @@ class Parser {
     }
   }
 
-  // This method produces a
+  // This method produces a Parser that is not responsible for the Builder
   explicit Parser(Builder& builder,
                   Options const* options = &Options::Defaults)
       : _start(nullptr), _size(0), _pos(0), _nesting(0),
@@ -188,7 +189,7 @@ class Parser {
 
   void clear() { _b->clear(); }
 
- private:
+ protected:
   inline int peek() const {
     if (_pos >= _size) {
       return -1;
@@ -287,7 +288,7 @@ class Parser {
 
   void parseNumber();
 
-  void parseString();
+  virtual void parseString();
 
   void parseArray();
 
@@ -295,6 +296,51 @@ class Parser {
 
   void parseJson();
 };
+
+class VJsonParser : public Parser {
+ public:
+  explicit VJsonParser(Options const* options = &Options::Defaults)
+      : Parser(options) {}
+
+  explicit VJsonParser(std::shared_ptr<Builder>& builder,
+                       Options const* options = &Options::Defaults)
+      : Parser(builder, options) {}
+
+  explicit VJsonParser(Builder& builder,
+                       Options const* options = &Options::Defaults)
+      : Parser(builder, options) {}
+
+  static std::shared_ptr<Builder> fromVJson(
+      std::string const& json,
+      Options const* options = &Options::Defaults) {
+    VJsonParser parser(options);
+    parser.parse(json);
+    return parser.steal();
+  }
+  
+  static std::shared_ptr<Builder> fromVJson(
+      char const* start, size_t size,
+      Options const* options = &Options::Defaults) {
+    VJsonParser parser(options);
+    parser.parse(start, size);
+    return parser.steal();
+  }
+
+  static std::shared_ptr<Builder> fromVJson(
+      uint8_t const* start, size_t size,
+      Options const* options = &Options::Defaults) {
+    VJsonParser parser(options);
+    parser.parse(start, size);
+    return parser.steal();
+  }
+
+ private:
+  void parseString() override;
+  void parseBase64();
+  void parseUTCDate();
+};
+
+using JsonParser = Parser;
 
 }  // namespace arangodb::velocypack
 }  // namespace arangodb

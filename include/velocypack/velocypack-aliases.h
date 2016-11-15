@@ -134,6 +134,8 @@ using VPackCustomTypeHandler = arangodb::velocypack::CustomTypeHandler;
 #ifndef VELOCYPACK_ALIAS_PARSER
 #define VELOCYPACK_ALIAS_PARSER
 using VPackParser = arangodb::velocypack::Parser;
+using VPackJsonParser = arangodb::velocypack::JsonParser;
+using VPackVJsonParser = arangodb::velocypack::VJsonParser;
 #endif
 #endif
 

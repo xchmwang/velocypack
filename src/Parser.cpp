@@ -26,11 +26,26 @@
 
 #include "velocypack/velocypack-common.h"
 #include "velocypack/Parser.h"
+#include "velocypack/Date.h"
 #include "asm-functions.h"
 
 #include <cstdlib>
+#include <chrono>
+#include <iostream>
+#include <sstream>
 
 using namespace arangodb::velocypack;
+
+static uint8_t const Base64DecodeTable[128] = {
+  255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,  
+  255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
+  255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,  62, 255,  62, 255,  63, 
+  52,  53,  54,  55,  56,  57,  58,  59,  60,  61, 255, 255,   0, 255, 255, 255, 
+  255,   0,   1,   2,   3,   4,   5,   6,   7,   8,   9,  10,  11,  12,  13,  14,
+  15,  16,  17,  18,  19,  20,  21,  22,  23,  24,  25, 255, 255, 255, 255,  63,
+  255,  26,  27,  28,  29,  30,  31,  32,  33,  34,  35,  36,  37,  38,  39,  40, 
+  41,  42,  43,  44,  45,  46,  47,  48,  49,  50,  51, 255, 255, 255, 255, 255
+};
 
 // The following function does the actual parse. It gets bytes
 // via peek, consume and reset appends the result to the Builder
@@ -492,14 +507,12 @@ void Parser::parseObject() {
     _b->reportAdd();
     bool excludeAttribute = false;
     auto const lastPos = _b->_pos;
-    if (options->attributeExcludeHandler == nullptr) {
-      parseString();
-    } else {
-      parseString();
-      if (options->attributeExcludeHandler->shouldExclude(
+    // always call parseString() method of JsonParser!
+    Parser::parseString();
+    if (options->attributeExcludeHandler != nullptr &&
+        options->attributeExcludeHandler->shouldExclude(
               Slice(_b->_start + lastPos), _nesting)) {
-        excludeAttribute = true;
-      }
+      excludeAttribute = true;
     }
 
     if (!excludeAttribute && options->attributeTranslator != nullptr) {
@@ -582,7 +595,7 @@ void Parser::parseJson() {
       parseNull();  // this consumes "ull" or throws
       break;
     case '"':
-      parseString();
+      parseString(); // virtual method call!
       break;
     default: {
       // everything else must be a number or is invalid...
@@ -594,3 +607,140 @@ void Parser::parseJson() {
     }
   }
 }
+
+// specialized parsing routine for VJson strings
+void VJsonParser::parseString() {
+  // When we get here, we have seen a " character and now want to
+  // find the end of the string and parse the string value to its
+  // VPack representation. We assume that the string is short and
+  // insert 8 bytes for the length as soon as we reach 127 bytes
+  // in the VPack representation.
+
+  if (_size - _pos < 2) {
+    throw Exception(Exception::ParseError, "Invalid VJSON string value");
+  }
+
+  // type byte comes first
+  uint8_t const* p = _start + _pos;
+  // the character following the type byte must be a ':'
+  uint8_t const type = *p++;
+  if (*p != ':') {
+    throw Exception(Exception::ParseError, "Invalid VJSON string value. Expecting ':'");
+  }
+  
+  switch (type) {
+    case 's': {
+      _pos += 2; // skip over type description and pretend this is a regular string
+      Parser::parseString();
+      break;
+    }
+    case 'b': {
+      _pos += 2; // skip over type description and pretend this is a regular string
+      parseBase64();
+      consume(); // we already validated before that the next character is a "
+      break;
+    }
+    case 'd': {
+      _pos += 2; // skip over type description and pretend this is a regular string
+      parseUTCDate();
+      consume(); // we already validated before that the next character is a "
+      break;
+    }
+    default: {
+      throw Exception(Exception::ParseError, "Invalid VJSON data type");
+    }
+  }
+}
+
+void VJsonParser::parseBase64() {
+  uint8_t const* end = static_cast<uint8_t const*>(memchr(_start + _pos, '"', _size - _pos));
+
+  if (end == nullptr) {
+    throw Exception(Exception::ParseError, "Invalid VJSON base64 value");
+  }
+  
+  size_t const length = end - _start - _pos;
+  size_t remainder = length;
+
+  // skip trailing = chars
+  while (remainder > 0 && _start[_pos + remainder - 1] == '=') {
+    --remainder;
+  }
+
+  size_t const decodedLength = 3 * remainder / 4;
+
+  _b->reserveSpace(9 + decodedLength); // reserve enough space for header and payload
+  _b->appendUInt(decodedLength, 0xbf);
+  
+  if (length == 0) {
+    // special case for an empty binary
+    return;
+  }
+
+  uint8_t const* p = _start + _pos;
+
+  do {
+    VELOCYPACK_ASSERT(remainder > 0);
+
+    uint8_t const b0 = (                 p[0] <= 'z') ? Base64DecodeTable[p[0]] : 0xff;
+    uint8_t const b1 = (remainder > 1 && p[1] <= 'z') ? Base64DecodeTable[p[1]] : 0xff;
+    uint8_t const b2 = (remainder > 2 && p[2] <= 'z') ? Base64DecodeTable[p[2]] : 0xff;
+    uint8_t const b3 = (remainder > 3 && p[3] <= 'z') ? Base64DecodeTable[p[3]] : 0xff;
+   
+    if (b1 != 0xff) {
+      _b->_start[_b->_pos++] = ((b0 & 0x3f) << 2) + ((b1 & 0x30) >> 4);
+      if (b2 != 0xff) {
+        _b->_start[_b->_pos++] = ((b1 & 0x0f) << 4) + ((b2 & 0x3c) >> 2);
+        if (b3 != 0xff) {
+          _b->_start[_b->_pos++] = ((b2 & 0x03) << 6) + ((b3 & 0x3f) >> 0);
+        } else if (remainder > 3) {
+          throw Exception(Exception::ParseError, "Invalid VJSON base64 value");
+        }
+      } else if (remainder > 2) {
+        throw Exception(Exception::ParseError, "Invalid VJSON base64 value");
+      }
+    } else {
+      // always an error
+      throw Exception(Exception::ParseError, "Invalid VJSON base64 value");
+    }
+
+    if (remainder <= 4) {
+      // reached the end
+      break;
+    }
+
+    remainder -= 4;
+    p += 4;    
+  } while (true);
+    
+  // finally adjust read position
+  _pos += length;
+}
+
+void VJsonParser::parseUTCDate() {
+  uint8_t const* end = static_cast<uint8_t const*>(memchr(_start + _pos, '"', _size - _pos));
+
+  if (end == nullptr) {
+    throw Exception(Exception::ParseError, "Invalid VJSON datetime value");
+  }
+
+  // create string from date
+  size_t const length = end - _start - _pos;
+  char const* p = reinterpret_cast<char const*>(_start + _pos);
+  std::string save(p, length);
+  std::istringstream in{save};
+  date::sys_time<std::chrono::milliseconds> tp;
+  // parse date value
+  date::parse(in, "%FT%TZ", tp);
+  if (in.fail()) {
+    in.clear();
+    in.exceptions(std::ios::failbit);
+    in.str(save);
+    date::parse(in, "%FT%T%Ez", tp);
+  }
+  
+  _b->addUTCDate(tp.time_since_epoch().count());
+  // finally adjust read position
+  _pos += length;
+}
+

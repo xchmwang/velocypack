@@ -50,6 +50,7 @@ class ObjectIterator;
 
 class Builder {
   friend class Parser;  // The parser needs access to internals.
+  friend class VJsonParser;  // The parser needs access to internals.
 
  public:
   // A struct for sorting index tables for objects:

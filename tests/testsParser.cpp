@@ -2556,6 +2556,186 @@ TEST(ParserTest, UseBuilderOnStackOptionsNullPtr) {
   delete parser;
 }
 
+TEST(ParserTest, VJsonBinaryEmpty) {
+  std::string const value("\"b:\"");
+
+  VJsonParser parser;
+  parser.parse(value);
+
+  std::shared_ptr<Builder> builder = parser.steal();
+  Slice s(builder->start());
+
+  checkBuild(s, ValueType::Binary, 2);
+  ValueLength len;
+  uint8_t const* r = s.getBinary(len);
+  ASSERT_EQ(0ULL, len);
+  ASSERT_EQ("", std::string(reinterpret_cast<char const*>(r), len));
+}
+
+TEST(ParserTest, VJsonBinaryOneByte) {
+  std::string const value("\"b:YQ==\"");
+
+  VJsonParser parser;
+  parser.parse(value);
+
+  std::shared_ptr<Builder> builder = parser.steal();
+  Slice s(builder->start());
+
+  checkBuild(s, ValueType::Binary, 3);
+  ValueLength len;
+  uint8_t const* r = s.getBinary(len);
+  ASSERT_EQ(1ULL, len);
+  ASSERT_EQ("a", std::string(reinterpret_cast<char const*>(r), len));
+}
+
+TEST(ParserTest, VJsonBinaryTwoBytes) {
+  std::string const value("\"b:YWE=\"");
+
+  VJsonParser parser;
+  parser.parse(value);
+
+  std::shared_ptr<Builder> builder = parser.steal();
+  Slice s(builder->start());
+
+  checkBuild(s, ValueType::Binary, 4);
+  ValueLength len;
+  uint8_t const* r = s.getBinary(len);
+  ASSERT_EQ(2ULL, len);
+  ASSERT_EQ("aa", std::string(reinterpret_cast<char const*>(r), len));
+}
+
+TEST(ParserTest, VJsonBinaryThreeBytes) {
+  std::string const value("\"b:YWFh\"");
+
+  VJsonParser parser;
+  parser.parse(value);
+
+  std::shared_ptr<Builder> builder = parser.steal();
+  Slice s(builder->start());
+
+  checkBuild(s, ValueType::Binary, 5);
+  ValueLength len;
+  uint8_t const* r = s.getBinary(len);
+  ASSERT_EQ(3ULL, len);
+  ASSERT_EQ("aaa", std::string(reinterpret_cast<char const*>(r), len));
+}
+
+TEST(ParserTest, VJsonBinaryFourBytes) {
+  std::string const value("\"b:YWFhYQ==\"");
+
+  VJsonParser parser;
+  parser.parse(value);
+
+  std::shared_ptr<Builder> builder = parser.steal();
+  Slice s(builder->start());
+
+  checkBuild(s, ValueType::Binary, 6);
+  ValueLength len;
+  uint8_t const* r = s.getBinary(len);
+  ASSERT_EQ(4ULL, len);
+  ASSERT_EQ("aaaa", std::string(reinterpret_cast<char const*>(r), len));
+}
+
+TEST(ParserTest, VJsonBinaryBroken1) {
+  std::string const value("\"b:d\""); // invalid
+
+  VJsonParser parser;
+  ASSERT_VELOCYPACK_EXCEPTION(parser.parse(value), Exception::ParseError);
+}
+
+TEST(ParserTest, VJsonBinaryBroken2) {
+  std::string const value("\"b:##\""); // invalid
+
+  VJsonParser parser;
+  ASSERT_VELOCYPACK_EXCEPTION(parser.parse(value), Exception::ParseError);
+}
+
+TEST(ParserTest, VJsonBinaryBroken3) {
+  std::string const value("\"b:ääää\""); // invalid
+
+  VJsonParser parser;
+  ASSERT_VELOCYPACK_EXCEPTION(parser.parse(value), Exception::ParseError);
+}
+
+TEST(ParserTest, VJsonBinaryString) {
+  std::string const value("\"b:dGhpcy1pcy1hLXRlc3Q\"");
+
+  VJsonParser parser;
+  parser.parse(value);
+
+  std::shared_ptr<Builder> builder = parser.steal();
+  Slice s(builder->start());
+
+  checkBuild(s, ValueType::Binary, 16);
+  ValueLength len;
+  uint8_t const* r = s.getBinary(len);
+  ASSERT_EQ(14ULL, len);
+  ASSERT_EQ("this-is-a-test", std::string(reinterpret_cast<char const*>(r), len));
+}
+
+TEST(ParserTest, VJsonBinaryLongString) {
+  std::string const value("\"b:YWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYQ==\"");
+
+  VJsonParser parser;
+  parser.parse(value);
+
+  std::shared_ptr<Builder> builder = parser.steal();
+  Slice s(builder->start());
+
+  checkBuild(s, ValueType::Binary, 259);
+  ValueLength len;
+  uint8_t const* r = s.getBinary(len);
+  ASSERT_EQ(256ULL, len);
+  ASSERT_EQ(std::string(256, 'a'), std::string(reinterpret_cast<char const*>(r), len));
+}
+
+TEST(ParserTest, VJsonObjectSimple) {
+  std::string const value("{\"foo\":\"s:bar\",\"baz\":\"b:dGhpcy1pcy1hLXRlc3Q\"}");
+
+  VJsonParser parser;
+  ValueLength l = parser.parse(value);
+  ASSERT_EQ(1ULL, l);
+
+  std::shared_ptr<Builder> builder = parser.steal();
+  Slice s(builder->start());
+  checkBuild(s, ValueType::Object, 33);
+  ASSERT_EQ(2ULL, s.length());
+
+  Slice ss = s.keyAt(0);
+  checkBuild(ss, ValueType::String, 4);
+  std::string correct = "baz";
+  ASSERT_EQ(correct, ss.copyString());
+  ss = s.valueAt(0);
+  checkBuild(ss, ValueType::Binary, 16);
+  ValueLength len;
+  uint8_t const* r = ss.getBinary(len);
+  ASSERT_EQ(14ULL, len);
+  ASSERT_EQ("this-is-a-test", std::string(reinterpret_cast<char const*>(r), len));
+
+  ss = s.keyAt(1);
+  checkBuild(ss, ValueType::String, 4);
+  correct = "foo";
+  ASSERT_EQ(correct, ss.copyString());
+  ss = s.valueAt(1);
+  checkBuild(ss, ValueType::String, 4);
+  correct = "bar";
+  ASSERT_EQ(correct, ss.copyString());
+}
+
+TEST(ParserTest, VJsonUTCDate) {
+  std::string const value("\"d:2016-11-15T23:33:00.012Z\"");
+
+  VJsonParser parser;
+  parser.parse(value);
+
+  std::shared_ptr<Builder> builder = parser.steal();
+  Slice s(builder->start());
+
+  checkBuild(s, ValueType::UTCDate, 9);
+  int64_t v = s.getUTCDate();
+  ASSERT_EQ(1479252780012LL, v);
+}
+
 int main(int argc, char* argv[]) {
   ::testing::InitGoogleTest(&argc, argv);
 
