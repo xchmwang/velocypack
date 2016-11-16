@@ -1551,6 +1551,20 @@ TEST(DumperTest, VJsonDumperBinaryFourBytes) {
   ASSERT_EQ(std::string(R"("b:YWFhYQ")"), buffer);
 }
 
+TEST(DumperTest, VJsonDumperUTCDate) {
+  Builder builder;
+  VJsonParser parser(builder);
+  parser.parse(R"("d:2016-11-15T23:33:00.012Z")");
+  Slice slice = builder.slice();
+  ASSERT_TRUE(slice.isUTCDate());
+
+  std::string buffer;
+  StringSink sink(&buffer);
+  VJsonDumper dumper(&sink);
+  dumper.dump(&slice);
+  ASSERT_EQ(std::string(R"("d:2016-11-15T23:33:00.012Z")"), buffer);
+}
+
 TEST(DumperTest, VJsonDumperSimpleObject) {
   Builder builder;
   VJsonParser parser(builder);

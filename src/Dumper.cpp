@@ -30,6 +30,7 @@
 #include "velocypack/Dumper.h"
 #include "velocypack/Iterator.h"
 #include "velocypack/ValueType.h"
+#include "velocypack/Date.h"
 
 using namespace arangodb::velocypack;
 
@@ -502,6 +503,11 @@ void VJsonDumper::dumpValue(Slice const* slice, Slice const* base) {
     }
     
     case ValueType::UTCDate: {
+      _sink->reserve(4 + 24);
+      _sink->append("\"d:", 3);
+      date::sys_time<std::chrono::milliseconds> tp(std::chrono::milliseconds(slice->getUTCDate()));
+      _sink->append(date::format("%FT%TZ", tp));
+      _sink->push_back('"');
       break;
     }
     
