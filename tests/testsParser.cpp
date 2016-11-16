@@ -2604,6 +2604,22 @@ TEST(ParserTest, VJsonBinaryTwoBytes) {
   ASSERT_EQ("aa", std::string(reinterpret_cast<char const*>(r), len));
 }
 
+TEST(ParserTest, VJsonBinaryTwoBytesNoTrailing) {
+  std::string const value("\"b:YWE\"");
+
+  VJsonParser parser;
+  parser.parse(value);
+
+  std::shared_ptr<Builder> builder = parser.steal();
+  Slice s(builder->start());
+
+  checkBuild(s, ValueType::Binary, 4);
+  ValueLength len;
+  uint8_t const* r = s.getBinary(len);
+  ASSERT_EQ(2ULL, len);
+  ASSERT_EQ("aa", std::string(reinterpret_cast<char const*>(r), len));
+}
+
 TEST(ParserTest, VJsonBinaryThreeBytes) {
   std::string const value("\"b:YWFh\"");
 
@@ -2622,6 +2638,22 @@ TEST(ParserTest, VJsonBinaryThreeBytes) {
 
 TEST(ParserTest, VJsonBinaryFourBytes) {
   std::string const value("\"b:YWFhYQ==\"");
+
+  VJsonParser parser;
+  parser.parse(value);
+
+  std::shared_ptr<Builder> builder = parser.steal();
+  Slice s(builder->start());
+
+  checkBuild(s, ValueType::Binary, 6);
+  ValueLength len;
+  uint8_t const* r = s.getBinary(len);
+  ASSERT_EQ(4ULL, len);
+  ASSERT_EQ("aaaa", std::string(reinterpret_cast<char const*>(r), len));
+}
+
+TEST(ParserTest, VJsonBinaryFourBytesNoTrailing) {
+  std::string const value("\"b:YWFhYQ\"");
 
   VJsonParser parser;
   parser.parse(value);

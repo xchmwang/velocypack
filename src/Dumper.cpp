@@ -33,6 +33,12 @@
 
 using namespace arangodb::velocypack;
 
+namespace {
+
+static char const Base64EncodingTable[] = 
+  "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+};
+
 // forward for fpconv function declared elsewhere
 namespace arangodb {
 namespace velocypack {
@@ -383,7 +389,10 @@ void Dumper::dumpValue(Slice const* slice, Slice const* base) {
         ++_indentation;
         while (it.valid()) {
           indent();
-          dumpValue(it.key(true), slice);
+          // no virtual dispatch here... we always want to dump the
+          // attribute name in pure JSON format
+          Slice key(it.key(true));
+          JsonDumper::dumpValue(&key, slice);
           _sink->append(" : ", 3);
           dumpValue(it.value(), slice);
           if (!it.isLast()) {
@@ -399,7 +408,10 @@ void Dumper::dumpValue(Slice const* slice, Slice const* base) {
           if (!it.isFirst()) {
             _sink->push_back(',');
           }
-          dumpValue(it.key(true), slice);
+          // no virtual dispatch here... we always want to dump the
+          // attribute name in pure JSON format
+          Slice key(it.key(true));
+          JsonDumper::dumpValue(&key, slice);
           _sink->push_back(':');
           dumpValue(it.value(), slice);
           it.next();
@@ -464,6 +476,76 @@ void Dumper::dumpValue(Slice const* slice, Slice const* base) {
         options->customTypeHandler->dump(*slice, this, *base);
       }
       break;
+    }
+  }
+}
+
+void VJsonDumper::dumpValue(Slice const* slice, Slice const* base) {
+  auto const type = slice->type();
+
+  if (type != ValueType::String &&
+      type != ValueType::UTCDate && 
+      type != ValueType::Binary) {
+    Dumper::dumpValue(slice, base);
+    return;
+  }
+
+  switch (type) {
+    case ValueType::String: {
+      ValueLength len;
+      char const* p = slice->getString(len);
+      _sink->reserve(4 + len);
+      _sink->append("\"s:", 3);
+      dumpString(p, len);
+      _sink->push_back('"');
+      break;
+    }
+    
+    case ValueType::UTCDate: {
+      break;
+    }
+    
+    case ValueType::Binary: {
+      ValueLength len;
+      uint8_t const* p = slice->getBinary(len);
+      _sink->reserve(4 + (4 * len / 3));
+      _sink->append("\"b:", 3);
+      dumpBinary(p, len);
+      _sink->push_back('"');
+      break;
+    }
+
+    default: {
+      throw Exception(Exception::InternalError);
+    }
+  }
+}
+
+void VJsonDumper::dumpBinary(uint8_t const* p, ValueLength length) {
+  // calculate end position
+  ValueLength missing = 0;
+  ValueLength tmp = length;
+  while (tmp % 3 != 0) {
+    ++tmp;
+    ++missing;
+  }
+  ValueLength const last = (4 * tmp / 3) - 1 - missing;
+
+  for (ValueLength offset = 0, out = 0; offset < length; offset += 3, out += 4) {
+    uint8_t const b0 = (offset + 0 < length) ? p[offset + 0] : 0;
+    uint8_t const b1 = (offset + 1 < length) ? p[offset + 1] : 0;
+    uint8_t const b2 = (offset + 2 < length) ? p[offset + 2] : 0;
+
+    _sink->push_back(Base64EncodingTable[(b0 & 0xfc) >> 2]);
+    // TODO: should we fill with = instead?
+    if (out + 1 <= last) {
+      _sink->push_back(Base64EncodingTable[(((b0 & 0x03) << 4) + ((b1 & 0xf0) >> 4))]);
+      if (out + 2 <= last) {
+        _sink->push_back(Base64EncodingTable[((b1 & 0x0f) << 2) + ((b2 & 0xc0) >> 6)]);
+        if (out + 3 <= last) {
+          _sink->push_back(Base64EncodingTable[((b2 & 0x3f) << 0)]);
+        }
+      }
     }
   }
 }

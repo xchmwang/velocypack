@@ -56,7 +56,7 @@ class Dumper {
     }
   }
 
-  ~Dumper() {}
+  virtual ~Dumper() {}
 
   Sink* sink() const { return _sink; }
 
@@ -113,19 +113,20 @@ class Dumper {
   void appendUInt(uint64_t);
 
   void appendDouble(double);
+  
+ protected:
+  virtual void dumpValue(Slice const* slice, Slice const* base = nullptr);
+  
+  void dumpString(char const*, ValueLength);
 
  private:
   void dumpUnicodeCharacter(uint16_t value);
 
   void dumpInteger(Slice const*);
 
-  void dumpString(char const*, ValueLength);
-
   inline void dumpValue(Slice const& slice, Slice const* base = nullptr) {
     dumpValue(&slice, base);
   }
-
-  void dumpValue(Slice const*, Slice const* = nullptr);
 
   void indent() {
     size_t n = _indentation;
@@ -147,11 +148,23 @@ class Dumper {
     throw Exception(Exception::NoJsonEquivalent);
   }
 
- private:
+ protected:
   Sink* _sink;
 
   int _indentation;
 };
+
+class VJsonDumper final : public Dumper {
+ public:
+  VJsonDumper(Sink* sink, Options const* options = &Options::Defaults)
+      : Dumper(sink, options) {}
+
+ private:
+  void dumpValue(Slice const* slice, Slice const* base) override;
+  void dumpBinary(uint8_t const* p, ValueLength length);
+};
+
+using JsonDumper = Dumper;
 
 }  // namespace arangodb::velocypack
 }  // namespace arangodb

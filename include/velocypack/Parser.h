@@ -297,7 +297,7 @@ class Parser {
   void parseJson();
 };
 
-class VJsonParser : public Parser {
+class VJsonParser final : public Parser {
  public:
   explicit VJsonParser(Options const* options = &Options::Defaults)
       : Parser(options) {}

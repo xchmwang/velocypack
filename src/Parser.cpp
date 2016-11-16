@@ -36,6 +36,8 @@
 
 using namespace arangodb::velocypack;
 
+namespace {
+
 static uint8_t const Base64DecodeTable[128] = {
   255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,  
   255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
@@ -46,6 +48,8 @@ static uint8_t const Base64DecodeTable[128] = {
   255,  26,  27,  28,  29,  30,  31,  32,  33,  34,  35,  36,  37,  38,  39,  40, 
   41,  42,  43,  44,  45,  46,  47,  48,  49,  50,  51, 255, 255, 255, 255, 255
 };
+
+}
 
 // The following function does the actual parse. It gets bytes
 // via peek, consume and reset appends the result to the Builder

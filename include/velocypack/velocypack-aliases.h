@@ -103,6 +103,8 @@ using VPackTopLevelAttributeExcludeHandler = arangodb::velocypack::TopLevelAttri
 #ifndef VELOCYPACK_ALIAS_DUMPER
 #define VELOCYPACK_ALIAS_DUMPER
 using VPackDumper = arangodb::velocypack::Dumper;
+using VPackJsonDumper = arangodb::velocypack::JsonDumper;
+using VPackVJsonDumper = arangodb::velocypack::VJsonDumper;
 #endif
 #endif
 

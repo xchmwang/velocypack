@@ -1476,6 +1476,97 @@ TEST(DumperTest, EmptyAttributeName) {
   ASSERT_EQ(std::string(R"({"":123,"a":"abc"})"), buffer);
 }
 
+TEST(DumperTest, VJsonDumperBinaryEmpty) {
+  Builder builder;
+  VJsonParser parser(builder);
+  parser.parse(R"("b:")");
+  Slice slice = builder.slice();
+  ASSERT_TRUE(slice.isBinary());
+  ASSERT_EQ(2UL, slice.byteSize());
+
+  std::string buffer;
+  StringSink sink(&buffer);
+  VJsonDumper dumper(&sink);
+  dumper.dump(&slice);
+  ASSERT_EQ(std::string(R"("b:")"), buffer);
+}
+
+TEST(DumperTest, VJsonDumperBinaryOneByte) {
+  Builder builder;
+  VJsonParser parser(builder);
+  parser.parse(R"("b:YQ==")");
+  Slice slice = builder.slice();
+  ASSERT_TRUE(slice.isBinary());
+  ASSERT_EQ(3UL, slice.byteSize());
+
+  std::string buffer;
+  StringSink sink(&buffer);
+  VJsonDumper dumper(&sink);
+  dumper.dump(&slice);
+  ASSERT_EQ(std::string(R"("b:YQ")"), buffer);
+}
+
+TEST(DumperTest, VJsonDumperBinaryTwoBytes) {
+  Builder builder;
+  VJsonParser parser(builder);
+  parser.parse(R"("b:YWE=")");
+  Slice slice = builder.slice();
+  ASSERT_TRUE(slice.isBinary());
+  ASSERT_EQ(4UL, slice.byteSize());
+
+  std::string buffer;
+  StringSink sink(&buffer);
+  VJsonDumper dumper(&sink);
+  dumper.dump(&slice);
+  ASSERT_EQ(std::string(R"("b:YWE")"), buffer);
+}
+
+TEST(DumperTest, VJsonDumperBinaryThreeBytes) {
+  Builder builder;
+  VJsonParser parser(builder);
+  parser.parse(R"("b:YWFh")");
+  Slice slice = builder.slice();
+  ASSERT_TRUE(slice.isBinary());
+  ASSERT_EQ(5UL, slice.byteSize());
+
+  std::string buffer;
+  StringSink sink(&buffer);
+  VJsonDumper dumper(&sink);
+  dumper.dump(&slice);
+  ASSERT_EQ(std::string(R"("b:YWFh")"), buffer);
+}
+
+TEST(DumperTest, VJsonDumperBinaryFourBytes) {
+  Builder builder;
+  VJsonParser parser(builder);
+  parser.parse(R"("b:YWFhYQ==")");
+  Slice slice = builder.slice();
+  ASSERT_TRUE(slice.isBinary());
+  ASSERT_EQ(6UL, slice.byteSize());
+
+  std::string buffer;
+  StringSink sink(&buffer);
+  VJsonDumper dumper(&sink);
+  dumper.dump(&slice);
+  ASSERT_EQ(std::string(R"("b:YWFhYQ")"), buffer);
+}
+
+TEST(DumperTest, VJsonDumperSimpleObject) {
+  Builder builder;
+  VJsonParser parser(builder);
+  parser.parse(R"({"foo":"s:bar","baz":"b:dGhpcy1pcy1hLXRlc3Q"})");
+  Slice slice = builder.slice();
+
+  ASSERT_TRUE(slice.get("foo").isString());
+  ASSERT_TRUE(slice.get("baz").isBinary());
+
+  std::string buffer;
+  StringSink sink(&buffer);
+  VJsonDumper dumper(&sink);
+  dumper.dump(&slice);
+  ASSERT_EQ(std::string(R"({"baz":"b:dGhpcy1pcy1hLXRlc3Q","foo":"s:bar"})"), buffer);
+}
+
 int main(int argc, char* argv[]) {
   ::testing::InitGoogleTest(&argc, argv);
 
