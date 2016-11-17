@@ -634,20 +634,29 @@ void VJsonParser::parseString() {
   
   switch (type) {
     case 's': {
+      // regular string
       _pos += 2; // skip over type description and pretend this is a regular string
       Parser::parseString();
       break;
     }
     case 'b': {
+      // binary data
       _pos += 2; // skip over type description and pretend this is a regular string
       parseBase64();
       consume(); // we already validated before that the next character is a "
       break;
     }
     case 'd': {
+      // date value, ISO8601
       _pos += 2; // skip over type description and pretend this is a regular string
-      parseUTCDate();
+      parseUTCDateIso8601();
       consume(); // we already validated before that the next character is a "
+      break;
+    }
+    case 'D': {
+      // date value, int64_t
+      _pos += 2; // skip over type description and pretend this is a regular string
+      parseUTCDateInteger();
       break;
     }
     default: {
@@ -721,7 +730,7 @@ void VJsonParser::parseBase64() {
   _pos += length;
 }
 
-void VJsonParser::parseUTCDate() {
+void VJsonParser::parseUTCDateIso8601() {
   uint8_t const* end = static_cast<uint8_t const*>(memchr(_start + _pos, '"', _size - _pos));
 
   if (end == nullptr) {
@@ -746,5 +755,48 @@ void VJsonParser::parseUTCDate() {
   _b->addUTCDate(tp.time_since_epoch().count());
   // finally adjust read position
   _pos += length;
+}
+
+void VJsonParser::parseUTCDateInteger() {
+  ParsedNumber numberValue;
+  bool negative = false;
+  int i = consume();
+  // We know that a character is coming, and it's a number if it
+  // starts with '-' or a digit. otherwise it's invalid
+  if (i == '-') {
+    i = getOneOrThrow("Incomplete number");
+    negative = true;
+  }
+  if (i < '0' || i > '9') {
+    throw Exception(Exception::ParseError, "Expecting digit");
+  }
+
+  if (i != '0') {
+    unconsume();
+    scanDigits(numberValue);
+  }
+
+  if (!numberValue.isInteger) {
+    throw Exception(Exception::ParseError, "Invalid VJSON datetime value. Integer value out of range");
+  } 
+  if (negative) {
+    if (numberValue.intValue <= static_cast<uint64_t>(INT64_MAX)) {
+      _b->addUTCDate(-static_cast<int64_t>(numberValue.intValue));
+    } else if (numberValue.intValue == toUInt64(INT64_MIN)) {
+      _b->addUTCDate(INT64_MIN);
+    } else {
+      throw Exception(Exception::ParseError, "Invalid VJSON datetime value. Integer value out of range");
+    }
+  } else {
+    if (numberValue.intValue > static_cast<uint64_t>(INT64_MAX)) {
+      throw Exception(Exception::ParseError, "Invalid VJSON datetime value. Integer value out of range");
+    }
+    _b->addUTCDate(static_cast<int64_t>(numberValue.intValue));
+  }
+  
+  i = consume();
+  if (i != '"') {
+    throw Exception(Exception::ParseError, "Expecting '\"'");
+  }
 }
 

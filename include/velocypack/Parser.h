@@ -337,7 +337,8 @@ class VJsonParser final : public Parser {
  private:
   void parseString() override;
   void parseBase64();
-  void parseUTCDate();
+  void parseUTCDateIso8601();
+  void parseUTCDateInteger();
 };
 
 using JsonParser = Parser;

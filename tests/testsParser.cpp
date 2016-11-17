@@ -2754,8 +2754,22 @@ TEST(ParserTest, VJsonObjectSimple) {
   ASSERT_EQ(correct, ss.copyString());
 }
 
-TEST(ParserTest, VJsonUTCDate) {
+TEST(ParserTest, VJsonUTCDateIso8601) {
   std::string const value("\"d:2016-11-15T23:33:00.012Z\"");
+
+  VJsonParser parser;
+  parser.parse(value);
+
+  std::shared_ptr<Builder> builder = parser.steal();
+  Slice s(builder->start());
+
+  checkBuild(s, ValueType::UTCDate, 9);
+  int64_t v = s.getUTCDate();
+  ASSERT_EQ(1479252780012LL, v);
+}
+
+TEST(ParserTest, VJsonUTCDateNumber) {
+  std::string const value("\"D:1479252780012\"");
 
   VJsonParser parser;
   parser.parse(value);
