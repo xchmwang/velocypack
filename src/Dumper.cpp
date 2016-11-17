@@ -486,7 +486,8 @@ void VJsonDumper::dumpValue(Slice const* slice, Slice const* base) {
 
   if (type != ValueType::String &&
       type != ValueType::UTCDate && 
-      type != ValueType::Binary) {
+      type != ValueType::Binary &&
+      type != ValueType::Custom) {
     Dumper::dumpValue(slice, base);
     return;
   }
@@ -503,6 +504,7 @@ void VJsonDumper::dumpValue(Slice const* slice, Slice const* base) {
     }
     
     case ValueType::UTCDate: {
+      // TODO: decide whether we should dump in "d:..." or "D:..." format
       _sink->reserve(4 + 24);
       _sink->append("\"d:", 3);
       date::sys_time<std::chrono::milliseconds> tp(std::chrono::milliseconds(slice->getUTCDate()));
@@ -517,6 +519,16 @@ void VJsonDumper::dumpValue(Slice const* slice, Slice const* base) {
       _sink->reserve(4 + (4 * len / 3));
       _sink->append("\"b:", 3);
       dumpBinary(p, len);
+      _sink->push_back('"');
+      break;
+    }
+    
+    case ValueType::Custom: {
+      ValueLength len = slice->byteSize();
+      _sink->reserve(4 + (4 * len / 3));
+      _sink->append("\"c:", 3);
+      // re-use dumpBinary for dumping custom types
+      dumpBinary(slice->begin(), len);
       _sink->push_back('"');
       break;
     }

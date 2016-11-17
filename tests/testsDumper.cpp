@@ -1565,6 +1565,62 @@ TEST(DumperTest, VJsonDumperUTCDate) {
   ASSERT_EQ(std::string(R"("d:2016-11-15T23:33:00.012Z")"), buffer);
 }
 
+TEST(DumperTest, VJsonDumperCustomF0) {
+  Builder builder;
+  VJsonParser parser(builder);
+  parser.parse(R"("c:8P8=")");
+  Slice slice = builder.slice();
+  ASSERT_TRUE(slice.isCustom());
+
+  std::string buffer;
+  StringSink sink(&buffer);
+  VJsonDumper dumper(&sink);
+  dumper.dump(&slice);
+  ASSERT_EQ(std::string(R"("c:8P8")"), buffer);
+}
+
+TEST(DumperTest, VJsonDumperCustomF1) {
+  Builder builder;
+  VJsonParser parser(builder);
+  parser.parse(R"("c:8f/+")");
+  Slice slice = builder.slice();
+  ASSERT_TRUE(slice.isCustom());
+
+  std::string buffer;
+  StringSink sink(&buffer);
+  VJsonDumper dumper(&sink);
+  dumper.dump(&slice);
+  ASSERT_EQ(std::string(R"("c:8f/+")"), buffer);
+}
+
+TEST(DumperTest, VJsonDumperCustomF2) {
+  Builder builder;
+  VJsonParser parser(builder);
+  parser.parse(R"("c:8v/+/fw=")");
+  Slice slice = builder.slice();
+  ASSERT_TRUE(slice.isCustom());
+
+  std::string buffer;
+  StringSink sink(&buffer);
+  VJsonDumper dumper(&sink);
+  dumper.dump(&slice);
+  ASSERT_EQ(std::string(R"("c:8v/+/fw")"), buffer);
+}
+
+TEST(DumperTest, VJsonDumperCustomF3) {
+  Builder builder;
+  VJsonParser parser(builder);
+  parser.parse(R"("c:8//+/fz7+vn4")");
+  Slice slice = builder.slice();
+  ASSERT_TRUE(slice.isCustom());
+
+  std::string buffer;
+  StringSink sink(&buffer);
+  VJsonDumper dumper(&sink);
+  dumper.dump(&slice);
+  ASSERT_EQ(std::string(R"("c:8//+/fz7+vn4")"), buffer);
+}
+
 TEST(DumperTest, VJsonDumperSimpleObject) {
   Builder builder;
   VJsonParser parser(builder);
