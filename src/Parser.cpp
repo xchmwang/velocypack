@@ -641,22 +641,29 @@ void VJsonParser::parseString() {
     }
     case 'b': {
       // binary data
-      _pos += 2; // skip over type description and pretend this is a regular string
+      _pos += 2; // skip over type description 
       parseBase64();
       consume(); // we already validated before that the next character is a "
       break;
     }
     case 'd': {
       // date value, ISO8601
-      _pos += 2; // skip over type description and pretend this is a regular string
+      _pos += 2; // skip over type description 
       parseUTCDateIso8601();
       consume(); // we already validated before that the next character is a "
       break;
     }
     case 'D': {
       // date value, int64_t
-      _pos += 2; // skip over type description and pretend this is a regular string
+      _pos += 2; // skip over type description
       parseUTCDateInteger();
+      break;
+    }
+    case 'c': {
+      // custom type
+      _pos += 2; // skip over type description 
+      parseCustom();
+      consume(); // we already validated before that the next character is a "
       break;
     }
     default: {
@@ -800,3 +807,108 @@ void VJsonParser::parseUTCDateInteger() {
   }
 }
 
+void VJsonParser::parseCustom() {
+  uint8_t const* end = static_cast<uint8_t const*>(memchr(_start + _pos, '"', _size - _pos));
+
+  if (end == nullptr) {
+    throw Exception(Exception::ParseError, "Invalid VJSON custom value");
+  }
+  
+  size_t const length = end - _start - _pos;
+
+  if (length == 0) {
+    // length of custom type must be > 0
+    throw Exception(Exception::ParseError, "Invalid VJSON custom value");
+  }
+
+  size_t remainder = length;
+
+  // skip trailing = chars
+  while (remainder > 0 && _start[_pos + remainder - 1] == '=') {
+    --remainder;
+  }
+
+  size_t const decodedLength = 3 * remainder / 4;
+
+  _b->reserveSpace(decodedLength); // reserve enough space for data
+  
+  uint8_t const* p = _start + _pos;
+  ValueLength const oldPos = _b->_pos;
+
+  do {
+    VELOCYPACK_ASSERT(remainder > 0);
+
+    uint8_t const b0 = (                 p[0] <= 'z') ? Base64DecodeTable[p[0]] : 0xff;
+    uint8_t const b1 = (remainder > 1 && p[1] <= 'z') ? Base64DecodeTable[p[1]] : 0xff;
+    uint8_t const b2 = (remainder > 2 && p[2] <= 'z') ? Base64DecodeTable[p[2]] : 0xff;
+    uint8_t const b3 = (remainder > 3 && p[3] <= 'z') ? Base64DecodeTable[p[3]] : 0xff;
+   
+    if (b1 != 0xff) {
+      _b->_start[_b->_pos++] = ((b0 & 0x3f) << 2) + ((b1 & 0x30) >> 4);
+      if (b2 != 0xff) {
+        _b->_start[_b->_pos++] = ((b1 & 0x0f) << 4) + ((b2 & 0x3c) >> 2);
+        if (b3 != 0xff) {
+          _b->_start[_b->_pos++] = ((b2 & 0x03) << 6) + ((b3 & 0x3f) >> 0);
+        } else if (remainder > 3) {
+          throw Exception(Exception::ParseError, "Invalid VJSON custom value");
+        }
+      } else if (remainder > 2) {
+        throw Exception(Exception::ParseError, "Invalid VJSON custom value");
+      }
+    } else {
+      // always an error
+      throw Exception(Exception::ParseError, "Invalid VJSON custom value");
+    }
+
+    if (remainder <= 4) {
+      // reached the end
+      break;
+    }
+
+    remainder -= 4;
+    p += 4;    
+  } while (true);
+
+  // now validate custom type
+  if (!isValidCustomType(oldPos)) {
+    throw Exception(Exception::ParseError, "Invalid VJSON custom value");
+  }
+    
+  // finally adjust read position
+  _pos += length;
+}
+  
+bool VJsonParser::isValidCustomType(ValueLength oldPos) const {
+  ValueLength const customLength = _b->_pos - oldPos;
+
+  switch (_b->_start[oldPos]) {
+    case 0xf0:
+      return (customLength == 2);
+    case 0xf1:
+      return (customLength == 3);
+    case 0xf2:
+      return (customLength == 5);
+    case 0xf3:
+      return (customLength == 9);
+    case 0xf4:
+    case 0xf5:
+    case 0xf6:
+      return (customLength >= 2 && customLength == 2 + readIntegerFixed<ValueLength, 1>(_b->_start + oldPos + 1));
+    case 0xf7:
+    case 0xf8:
+    case 0xf9:
+      return (customLength >= 3 && customLength == 3 + readIntegerFixed<ValueLength, 2>(_b->_start + oldPos + 1));
+    case 0xfa:
+    case 0xfb:
+    case 0xfc:
+      return (customLength >= 5 && customLength == 5 + readIntegerFixed<ValueLength, 4>(_b->_start + oldPos + 1));
+    case 0xfd:
+    case 0xfe:
+    case 0xff:
+      return (customLength >= 9 && customLength == 9 + readIntegerFixed<ValueLength, 8>(_b->_start + oldPos + 1));
+    default: {
+      // invalid custom type
+    }
+  }
+  return false;
+}

@@ -339,6 +339,9 @@ class VJsonParser final : public Parser {
   void parseBase64();
   void parseUTCDateIso8601();
   void parseUTCDateInteger();
+  void parseCustom();
+
+  bool isValidCustomType(ValueLength oldPos) const;
 };
 
 using JsonParser = Parser;

@@ -2782,6 +2782,105 @@ TEST(ParserTest, VJsonUTCDateNumber) {
   ASSERT_EQ(1479252780012LL, v);
 }
 
+TEST(ParserTest, VJsonCustomF0) {
+  std::string const value("\"c:8P8=\"");
+
+  VJsonParser parser;
+  parser.parse(value);
+
+  std::shared_ptr<Builder> builder = parser.steal();
+  Slice s(builder->start());
+
+  checkBuild(s, ValueType::Custom, 2);
+  uint8_t const* p = s.begin();
+  ASSERT_EQ(0xf0UL, *p++);
+  ASSERT_EQ(0xffUL, *p++);
+}
+
+TEST(ParserTest, VJsonCustomF0Broken) {
+  std::string const value("\"c:8A==\"");
+
+  VJsonParser parser;
+  ASSERT_VELOCYPACK_EXCEPTION(parser.parse(value), Exception::ParseError);
+}
+
+TEST(ParserTest, VJsonCustomF1) {
+  std::string const value("\"c:8f/+\"");
+
+  VJsonParser parser;
+  parser.parse(value);
+
+  std::shared_ptr<Builder> builder = parser.steal();
+  Slice s(builder->start());
+
+  checkBuild(s, ValueType::Custom, 3);
+  uint8_t const* p = s.begin();
+  ASSERT_EQ(0xf1UL, *p++);
+  ASSERT_EQ(0xffUL, *p++);
+  ASSERT_EQ(0xfeUL, *p++);
+}
+
+TEST(ParserTest, VJsonCustomF1Broken) {
+  std::string const value("\"c:8f8=\"");
+
+  VJsonParser parser;
+  ASSERT_VELOCYPACK_EXCEPTION(parser.parse(value), Exception::ParseError);
+}
+
+TEST(ParserTest, VJsonCustomF2) {
+  std::string const value("\"c:8v/+/fw=\"");
+
+  VJsonParser parser;
+  parser.parse(value);
+
+  std::shared_ptr<Builder> builder = parser.steal();
+  Slice s(builder->start());
+
+  checkBuild(s, ValueType::Custom, 5);
+  uint8_t const* p = s.begin();
+  ASSERT_EQ(0xf2UL, *p++);
+  ASSERT_EQ(0xffUL, *p++);
+  ASSERT_EQ(0xfeUL, *p++);
+  ASSERT_EQ(0xfdUL, *p++);
+  ASSERT_EQ(0xfcUL, *p++);
+}
+
+TEST(ParserTest, VJsonCustomF2Broken) {
+  std::string const value("\"c:8v/+/Q==\"");
+
+  VJsonParser parser;
+  ASSERT_VELOCYPACK_EXCEPTION(parser.parse(value), Exception::ParseError);
+}
+
+TEST(ParserTest, VJsonCustomF3) {
+  std::string const value("\"c:8//+/fz7+vn4\"");
+
+  VJsonParser parser;
+  parser.parse(value);
+
+  std::shared_ptr<Builder> builder = parser.steal();
+  Slice s(builder->start());
+
+  checkBuild(s, ValueType::Custom, 9);
+  uint8_t const* p = s.begin();
+  ASSERT_EQ(0xf3UL, *p++);
+  ASSERT_EQ(0xffUL, *p++);
+  ASSERT_EQ(0xfeUL, *p++);
+  ASSERT_EQ(0xfdUL, *p++);
+  ASSERT_EQ(0xfcUL, *p++);
+  ASSERT_EQ(0xfbUL, *p++);
+  ASSERT_EQ(0xfaUL, *p++);
+  ASSERT_EQ(0xf9UL, *p++);
+  ASSERT_EQ(0xf8UL, *p++);
+}
+
+TEST(ParserTest, VJsonCustomF3Broken) {
+  std::string const value("\"c:8//+/fz7+vk=\"");
+
+  VJsonParser parser;
+  ASSERT_VELOCYPACK_EXCEPTION(parser.parse(value), Exception::ParseError);
+}
+
 int main(int argc, char* argv[]) {
   ::testing::InitGoogleTest(&argc, argv);
 
