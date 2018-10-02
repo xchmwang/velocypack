@@ -70,7 +70,7 @@ else()
 endif()
 message(STATUS "Building with hash type: ${HashType}")
 
-add_library(velocypack STATIC ${VELOCY_SOURCE})
+add_library(velocypack SHARED ${VELOCY_SOURCE})
 target_include_directories(velocypack PRIVATE src)
 target_include_directories(velocypack PUBLIC include)
 
